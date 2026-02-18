@@ -1,6 +1,6 @@
 # WordPress Runbook Template
 
-A comprehensive, ready-to-customize operations runbook for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. Provided in three formats so your team can use whichever fits best.
+A comprehensive, ready-to-customize operations runbook for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. (.md, .docx, .pages, .pdf)
 
 ## Who is this for?
 
