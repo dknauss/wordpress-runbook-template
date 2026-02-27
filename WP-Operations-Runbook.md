@@ -159,8 +159,8 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 
 | Layer | Technology | Purpose | TTL |
 |-------|-----------|---------|-----|
-| **Page Cache** | [CUSTOMIZE: W3 Total Cache / WP Super Cache] | Full page HTML | 1 hour |
-| **Object Cache** | [CUSTOMIZE: Redis / Memcached] | Database queries, transients | 24 hours |
+| **Page Cache** | [CUSTOMIZE: W3 Total Cache / WP Super Cache / Litespeed] | Full page HTML | 1 hour |
+| **Object Cache** | [CUSTOMIZE: Redis / Memcached / Object Cache Pro] | Database queries, transients | 24 hours |
 | **Browser Cache** | HTTP headers (Cache-Control) | Client-side assets | 1 week (CSS/JS), 1 month (images) |
 | **Database Query Cache** | MySQL Query Cache | SELECT statements | Disabled / configured |
 | **CDN Cache** | [CUSTOMIZE: Cloudflare / Bunny / AWS CloudFront] | Static assets, images | Varies |
