@@ -119,30 +119,30 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                        Client Browsers                   │
+│                        Client Browsers                  │
 └────────────────────────┬────────────────────────────────┘
                          │ HTTPS
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              Nginx (Reverse Proxy + Web Server)         │
-│           (Port 80 → 443, SSL Termination)             │
+│           (Port 80 → 443, SSL Termination)              │
 └────────────────────────┬────────────────────────────────┘
                          │ FastCGI
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │                   PHP-FPM (Application)                 │
-│         (WordPress, WP-CLI, Plugins, Themes)           │
+│         (WordPress, WP-CLI, Plugins, Themes)            │
 └────────────────────────┬────────────────────────────────┘
                          │ TCP/Socket
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              MySQL / MariaDB (Database)                 │
-│         (WordPress Posts, Users, Metadata)             │
+│         (WordPress Posts, Users, Metadata)              │
 └─────────────────────────────────────────────────────────┘
 
                     Caching Layer (Optional)
 ┌─────────────────────────────────────────────────────────┐
-│  Redis (Object Cache) / Memcached (Session Store)      │
+│  Redis (Object Cache) / Memcached (Session Store)       │
 └─────────────────────────────────────────────────────────┘
 ```
 
