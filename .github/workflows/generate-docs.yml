@@ -1,0 +1,103 @@
+name: Generate PDF & Word Documents
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+      - '.github/workflows/generate-docs.yml'
+      - '.github/pandoc/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: |
+          PANDOC_VER=3.6.3
+          wget -q "https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb"
+          sudo dpkg -i "pandoc-${PANDOC_VER}-1-amd64.deb"
+          rm "pandoc-${PANDOC_VER}-1-amd64.deb"
+
+      - name: Install LaTeX and fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            texlive-xetex \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
+            texlive-latex-extra \
+            fonts-liberation
+
+      - name: Install eisvogel template
+        run: |
+          mkdir -p ~/.pandoc/templates
+          curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz" \
+            | tar -xz
+          find . -maxdepth 2 -name "eisvogel.latex" -exec mv {} ~/.pandoc/templates/ \;
+
+      - name: Bootstrap reference.docx
+        run: |
+          mkdir -p .github/pandoc
+          if [ ! -f .github/pandoc/reference.docx ]; then
+            pandoc --print-default-data-file reference.docx > .github/pandoc/reference.docx
+            echo "Created default reference.docx (customise via Word to restyle DOCX output)"
+          fi
+
+      - name: Convert Markdown files
+        run: |
+          find . \
+            -name "*.md" \
+            -not -name "README.md" \
+            -not -path "./.github/*" \
+            -not -path "./node_modules/*" \
+            | sort \
+            | while read -r md_file; do
+
+              base="${md_file%.md}"
+
+              # Title: first H1 heading, else formatted filename
+              title=$(grep -m1 "^# " "$md_file" 2>/dev/null | sed 's/^# //')
+              [ -z "$title" ] && title=$(basename "${md_file%.md}" | tr '-' ' ')
+              today=$(date '+%B %Y')
+
+              echo "▶ $md_file → \"$title\""
+
+              pandoc "$md_file" \
+                --template eisvogel \
+                --pdf-engine xelatex \
+                --defaults ".github/pandoc/pdf-defaults.yaml" \
+                --metadata "title=$title" \
+                --metadata "date=$today" \
+                --toc --toc-depth=3 --number-sections \
+                -o "${base}.pdf" \
+                && echo "  ✓ PDF" || echo "  ✗ PDF failed"
+
+              pandoc "$md_file" \
+                --reference-doc=".github/pandoc/reference.docx" \
+                --metadata "title=$title" \
+                --metadata "date=$today" \
+                --toc --toc-depth=3 \
+                -o "${base}.docx" \
+                && echo "  ✓ DOCX" || echo "  ✗ DOCX failed"
+            done
+
+      - name: Commit generated documents
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: regenerate PDF and Word documents [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
