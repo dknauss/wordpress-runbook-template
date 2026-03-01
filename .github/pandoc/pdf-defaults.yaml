@@ -1,9 +1,9 @@
 # Pandoc PDF defaults — eisvogel template, professional dark-header layout
 variables:
-  # Fonts — Liberation family is pre-installed on Ubuntu runners
-  mainfont: "Liberation Serif"
-  sansfont: "Liberation Sans"
-  monofont: "Liberation Mono"
+  # Fonts — Noto family has broad Unicode coverage (checkmarks, symbols, etc.)
+  mainfont: "Noto Serif"
+  sansfont: "Noto Sans"
+  monofont: "Noto Sans Mono"
   fontsize: "11pt"
 
   # Page layout
