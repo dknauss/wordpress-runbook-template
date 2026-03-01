@@ -1,0 +1,33 @@
+# Pandoc PDF defaults — eisvogel template, professional dark-header layout
+variables:
+  # Fonts — Liberation family is pre-installed on Ubuntu runners
+  mainfont: "Liberation Serif"
+  sansfont: "Liberation Sans"
+  monofont: "Liberation Mono"
+  fontsize: "11pt"
+
+  # Page layout
+  geometry: "margin=2.5cm, top=3cm, bottom=3cm"
+  linestretch: 1.2
+
+  # Title page — deep navy background with WordPress-blue rule
+  titlepage: true
+  titlepage-color: "1A1A2E"        # Deep navy
+  titlepage-text-color: "FFFFFF"   # White
+  titlepage-rule-color: "0073AA"   # WordPress blue
+  titlepage-rule-height: 6
+
+  # TOC on its own page
+  toc-own-page: true
+
+  # Hyperlinks — navy blue
+  colorlinks: true
+  linkcolor: "NavyBlue"
+  urlcolor: "NavyBlue"
+  citecolor: "NavyBlue"
+
+  # Tables — alternating row shading
+  table-use-row-colors: true
+
+  # Code — avoid breaking across pages
+  listings-no-page-break: true
