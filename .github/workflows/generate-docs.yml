@@ -45,8 +45,9 @@ jobs:
           TMPDIR_EIS=$(mktemp -d)
           curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz" \
             | tar -xz -C "$TMPDIR_EIS"
-          find "$TMPDIR_EIS" -name "eisvogel.latex" -exec mv {} ~/.pandoc/templates/ \;
+          find "$TMPDIR_EIS" -name "*.latex" -exec cp {} ~/.pandoc/templates/ \;
           rm -rf "$TMPDIR_EIS"
+          ls ~/.pandoc/templates/
 
       - name: Bootstrap reference.docx
         run: |
