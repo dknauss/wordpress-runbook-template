@@ -30,19 +30,23 @@ jobs:
       - name: Install LaTeX and fonts
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             texlive-xetex \
+            texlive-latex-recommended \
             texlive-fonts-recommended \
             texlive-fonts-extra \
             texlive-latex-extra \
+            lmodern \
             fonts-liberation
 
       - name: Install eisvogel template
         run: |
           mkdir -p ~/.pandoc/templates
+          TMPDIR_EIS=$(mktemp -d)
           curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz" \
-            | tar -xz
-          find . -maxdepth 2 -name "eisvogel.latex" -exec mv {} ~/.pandoc/templates/ \;
+            | tar -xz -C "$TMPDIR_EIS"
+          find "$TMPDIR_EIS" -name "eisvogel.latex" -exec mv {} ~/.pandoc/templates/ \;
+          rm -rf "$TMPDIR_EIS"
 
       - name: Bootstrap reference.docx
         run: |
@@ -94,7 +98,7 @@ jobs:
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add -A
+          git add *.pdf *.docx .github/pandoc/reference.docx 2>/dev/null || true
           if ! git diff --staged --quiet; then
             git commit -m "docs: regenerate PDF and Word documents [skip ci]"
             git push
