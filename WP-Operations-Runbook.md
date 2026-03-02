@@ -1,10 +1,10 @@
-# WordPress Operations Runbook
+# WordPress Operations Runbook for [CUSTOMIZE: Domain/Instance/Environment] 
 
-**Version:** 2.0  
-**Last Updated:** February 2026  
-**Next Review:** February 2027  
+**Version:** [CUSTOMIZE: Operations Team Name] 
+**Last Updated:** [CUSTOMIZE: Date] 
+**Next Review:** [CUSTOMIZE: Date] 
 **Owner:** [CUSTOMIZE: Operations Team Name]  
-**Environment:** [CUSTOMIZE: Production/Staging/Development]
+**Environment:** [CUSTOMIZE: Stack Details; Production/Staging/Development]
 
 ---
 
@@ -2832,7 +2832,7 @@ This section documents all updates to this runbook and corresponding infrastruct
 
 ## Quick Reference Card (Printable)
 
-For quick access during incidents, print this card and keep near your desk.
+For quick access during incidents, print this card and keep it near your desk.
 
 ```
 ╔════════════════════════════════════════════════════════════╗
@@ -2915,27 +2915,27 @@ ESCALATION PATH:
 
 ## Document Metadata
 
-**Document Title:** WordPress Operations Runbook  
-**Version:** 2.0  
-**Status:** Active  
-**Last Updated:** February 2026  
-**Next Review Date:** February 2027  
+**Document Title:** WordPress Operations Runbook for [CUSTOMIZE: Domain/Instance/Environment/Audience]  
+**Version:** [CUSTOMIZE: Version Number] 
+**Status:** [CUSTOMIZE: Draft/Active/Deprecated/Retired] 
+**Last Updated:** [CUSTOMIZE: Date] 
+**Next Review Date:** [CUSTOMIZE: Date] 
 **Document Owner:** [CUSTOMIZE: Operations Team]  
 **Approval:** [CUSTOMIZE: Manager Name and Date]  
 
 **Change Request Process:**
-1. Submit change request to [CUSTOMIZE: owner email]
+1. Submit your change request to [CUSTOMIZE: owner email].
 2. Include: section, change description, justification, testing done
-3. Document will be updated and version incremented
-4. All stakeholders notified of changes
-5. Training scheduled if needed
+3. The document will be updated, and the version will be incremented.
+4. All stakeholders will be notified of changes.
+5. Training will be scheduled if needed.
 
-**Feedback & Improvements:**
+**Feedback and Improvements:**
 To suggest improvements to this runbook, please contact [CUSTOMIZE: owner email] with:
-- What section or procedure
+- Identified section or procedure to improve
 - What was unclear or missing
-- Suggested improvement
-- Contact information
+- Suggested improvements
+- Your contact information
 
 ---
 
