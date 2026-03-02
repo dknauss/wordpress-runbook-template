@@ -85,6 +85,10 @@ This runbook is one of four complementary documents covering WordPress security 
 | **[WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)** | Advisory — "what to implement." Enterprise-focused security architecture and threat mitigation. |
 | **[WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide)** | Editorial — "how to write about it." Terminology, voice, and formatting conventions for security communication. |
 
+## AI-Assisted Editorial Process
+
+This document and the three related documents in this series are revised with the assistance of frontier LLMs. Multiple models independently review all four documents for factual errors, outdated guidance, and cross-document misalignments, with the WordPress Advanced Administration Handbook as primary authority. A human editor reviews, approves, or rejects every recommended change before it is applied. For the full methodology, see **[AI-Assisted Documentation Processes](https://github.com/dknauss/ai-assisted-docs)**.
+
 ## Contributing
 
 This is a general-purpose template. If you find gaps, errors, or have procedures that would benefit the broader WordPress community, pull requests are welcome. Please keep contributions environment-agnostic — no hosting-provider-specific or proprietary-tool-specific content.
