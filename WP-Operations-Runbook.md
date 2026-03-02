@@ -1,8 +1,3 @@
-<!--
-To adapt this document for your own use, first close the repository. Then reformat the cover page as you like, and remove any unnecessary sections. 
-Replace all blanks marked [CUSTOMIZE:...] with your own information.
--->
-
 ---
 title: "WordPress Operations Runbook [TEMPLATE]"
 subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
@@ -29,6 +24,12 @@ header-includes: |
     }%
   }
 ---
+
+<!--
+To adapt this document for your own use, first close the repository. Then reformat the cover page as you like, and remove any unnecessary sections. 
+Replace all blanks marked [CUSTOMIZE:...] with your own information.
+-->
+
 
 **Emergency Quick-Reference Card**
 
