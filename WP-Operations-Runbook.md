@@ -4,14 +4,25 @@ subtitle: "Template for [CUSTOMIZE: Domain/Instance/Environment]"
 author: "General Editor: Dan Knauss"
 date: "March 2, 2026"
 version: "2.0"
----
-
-|| Please keep the following information updated. |
-| :--- | :--- |
-| **Owner:** | [CUSTOMIZE: Operations Team Name] |
-| **Environment:** | [CUSTOMIZE: Stack Details; Production/Staging/Development] |
-| **Next Review:** | [CUSTOMIZE: Date] |
-
+header-includes: |
+  \usepackage{eso-pic}
+  \AtBeginDocument{%
+    \AddToShipoutPictureFG*{%
+      \AtPageLowerLeft{%
+        \hspace{2.5cm}\raisebox{2.5cm}{%
+          \begin{minipage}[b]{12cm}
+          \color{white}\footnotesize
+          \renewcommand{\arraystretch}{1.4}
+          \begin{tabular}{@{}l@{\hspace{0.8em}}l}
+          \textbf{Owner:} & {[CUSTOMIZE: Operations Team Name]} \\
+          \textbf{Environment:} & {[CUSTOMIZE: Stack Details]} \\
+          \textbf{Next Review:} & {[CUSTOMIZE: Date]} \\
+          \end{tabular}
+          \end{minipage}
+        }%
+      }%
+    }%
+  }
 ---
 
 **Emergency Quick-Reference Card**

@@ -98,7 +98,7 @@ jobs:
                 --pdf-engine xelatex \
                 --defaults ".github/pandoc/pdf-defaults.yaml" \
                 --metadata "date=${display_date}" \
-                --toc --toc-depth=3 --number-sections \
+                --toc --toc-depth=3 \
                 -o "${base}.pdf" \
                 && echo "  ✓ PDF" || echo "  ✗ PDF failed"
 
