@@ -26,7 +26,9 @@ The runbook template is provided in four formats:
 | `WP-Operations-Runbook.docx` | Microsoft Word | Corporate intranets, SharePoint, collaborative editing |
 | `WP-Operations-Runbook.pdf` | PDF | Printing, read-only distribution, archival |
 
-All three contain identical content organized into 11 sections plus appendices:
+The Markdown file is the source for generating the Word document, whose styling and formatting are then incorporated with the text into the PDF version, which is generated from the .docx file. 
+
+All three documents contain identical content organized into 11 sections plus appendices:
 
 1. **Document Information** — ownership, audience, document conventions
 2. **Site Overview** — site identity, credentials vault, team contacts
