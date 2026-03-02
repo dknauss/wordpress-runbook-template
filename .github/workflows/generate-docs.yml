@@ -1,4 +1,4 @@
-name: Generate PDF & Word Documents
+name: Generate PDF, Word & EPUB Documents
 
 on:
   push:
@@ -62,6 +62,18 @@ jobs:
             echo "Created default reference.docx (customise via Word to restyle DOCX output)"
           fi
 
+      - name: Update date in frontmatter
+        run: |
+          today=$(date '+%B %-d, %Y')
+          find . -name "*.md" -not -name "README.md" \
+            -not -path "./.github/*" -not -path "./node_modules/*" \
+            | while read -r md_file; do
+              if head -1 "$md_file" | grep -q '^---$'; then
+                sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
+                echo "  Updated date → $today in $md_file"
+              fi
+            done
+
       - name: Convert Markdown files
         run: |
           find . \
@@ -74,39 +86,44 @@ jobs:
 
               base="${md_file%.md}"
 
-              # Title: first H1 heading, else formatted filename
-              title=$(grep -m1 "^# " "$md_file" 2>/dev/null | sed 's/^# //')
-              [ -z "$title" ] && title=$(basename "${md_file%.md}" | tr '-' ' ')
-              today=$(date '+%B %Y')
+              # Read version from YAML frontmatter
+              version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p }' "$md_file")
+              display_date="Version ${version} — $(date '+%B %-d, %Y')"
 
-              echo "▶ $md_file → \"$title\""
+              echo "▶ $md_file (${display_date})"
 
+              # PDF via eisvogel + XeLaTeX
               pandoc "$md_file" \
                 --template eisvogel \
                 --pdf-engine xelatex \
                 --defaults ".github/pandoc/pdf-defaults.yaml" \
-                --metadata "title=$title" \
-                --metadata "date=$today" \
+                --metadata "date=${display_date}" \
                 --toc --toc-depth=3 --number-sections \
                 -o "${base}.pdf" \
                 && echo "  ✓ PDF" || echo "  ✗ PDF failed"
 
+              # DOCX via reference template
               pandoc "$md_file" \
                 --reference-doc=".github/pandoc/reference.docx" \
-                --metadata "title=$title" \
-                --metadata "date=$today" \
                 --toc --toc-depth=3 \
                 -o "${base}.docx" \
                 && echo "  ✓ DOCX" || echo "  ✗ DOCX failed"
+
+              # EPUB
+              pandoc "$md_file" \
+                --toc --toc-depth=3 \
+                --epub-title-page=false \
+                -o "${base}.epub" \
+                && echo "  ✓ EPUB" || echo "  ✗ EPUB failed"
             done
 
       - name: Commit generated documents
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add *.pdf *.docx .github/pandoc/reference.docx 2>/dev/null || true
+          git add *.md *.pdf *.docx *.epub .github/pandoc/reference.docx 2>/dev/null || true
           if ! git diff --staged --quiet; then
-            git commit -m "docs: regenerate PDF and Word documents [skip ci]"
+            git commit -m "docs: regenerate PDF, Word, and EPUB documents [skip ci]"
             git pull --rebase origin main
             git push
           else

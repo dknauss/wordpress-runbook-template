@@ -1,22 +1,20 @@
-# WordPress Operations Runbook for [CUSTOMIZE: Domain/Instance] 
+---
+title: "WordPress Operations Runbook"
+subtitle: "Template for [CUSTOMIZE: Domain/Instance/Environment]"
+author: "General Editor: Dan Knauss"
+date: "March 2, 2026"
+version: "2.0"
+---
 
-|**Environment:**|
-|:----------------------------------------------|
-|[Stack/Details]|  
-
-<br /><br />
-
-|**Version:**|**Last Updated:**|**Next Review:**|
-|:-----------|:----------------|:---------------|
-|   #.#.#    |  [YYYY-MM-DD]   |  [YYYY-MM-DD]  |
-
-|**Owner:**|               
-|:----------------------------------------------|
-|[Team/Lead]|
+| Property | Value |
+|----------|-------|
+| **Next Review** | [CUSTOMIZE: Date] |
+| **Owner** | [CUSTOMIZE: Operations Team Name] |
+| **Environment** | [CUSTOMIZE: Stack Details; Production/Staging/Development] |
 
 ---
 
-## Emergency Quick-Reference Card
+**Emergency Quick-Reference Card**
 
 Use this table to quickly find solutions to common issues.
 
