@@ -1,7 +1,12 @@
+<!--
+To adapt this document for your own use, first close the repository. Then reformat the cover page as you like, and remove any unnecessary sections. 
+Replace all blanks marked [CUSTOMIZE:...] with your own information.
+-->
+
 ---
 title: "WordPress Operations Runbook [TEMPLATE]"
 subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
-author: "General Editor: Dan Knauss"
+author: "Dan Knauss"
 date: "March 2, 2026"
 version: "2.0"
 header-includes: |
