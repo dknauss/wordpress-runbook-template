@@ -24,10 +24,9 @@ The runbook template is provided in four formats:
 |------|--------|----------|
 | `WP-Operations-Runbook.md` | Markdown | Git repositories, wikis, version-controlled documentation |
 | `WP-Operations-Runbook.docx` | Microsoft Word | Corporate intranets, SharePoint, collaborative editing |
-| `WP-Operations-Runbook.pages` | Apple Pages | macOS-based teams and environments |
 | `WP-Operations-Runbook.pdf` | PDF | Printing, read-only distribution, archival |
 
-All four contain identical content organized into 11 sections plus appendices:
+All three contain identical content organized into 11 sections plus appendices:
 
 1. **Document Information** — ownership, audience, document conventions
 2. **Site Overview** — site identity, credentials vault, team contacts
