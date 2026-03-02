@@ -1,6 +1,6 @@
 ---
-title: "WordPress Operations Runbook"
-subtitle: "Template for [CUSTOMIZE: Domain/Instance/Environment]"
+title: "WordPress Operations Runbook [TEMPLATE]"
+subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
 author: "General Editor: Dan Knauss"
 date: "March 2, 2026"
 version: "2.0"
@@ -9,7 +9,7 @@ header-includes: |
   \AtBeginDocument{%
     \AddToShipoutPictureFG*{%
       \AtPageLowerLeft{%
-        \hspace{2.5cm}\raisebox{2.5cm}{%
+        \hspace{3.5cm}\raisebox{2.5cm}{%
           \begin{minipage}[b]{12cm}
           \color{white}\footnotesize
           \renewcommand{\arraystretch}{1.4}
