@@ -86,9 +86,12 @@ This runbook is one of four complementary documents covering WordPress security 
 | **[WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)** | Advisory — "what to implement." Enterprise-focused security architecture and threat mitigation. |
 | **[WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide)** | Editorial — "how to write about it." Terminology, voice, and formatting conventions for security communication. |
 
-## Editorial Team
+## Contributors
 
-- [Dan Knauss](https://dan.knauss.ca)
+- [Dan Knauss](https://dan.knauss.ca) — author, editor
+- [Claude](https://claude.ai) (Anthropic) — review, revision, cross-document alignment
+- [Gemini](https://gemini.google.com) (Google) — independent review and revision planning
+- [GPT-5 Codex](https://openai.com) (OpenAI) — independent review and revision planning
 
 ## AI-Assisted Editorial Process
 
