@@ -6,11 +6,11 @@ date: "March 2, 2026"
 version: "2.0"
 ---
 
-| Property | Value |
-|----------|-------|
-| **Next Review** | [CUSTOMIZE: Date] |
-| **Owner** | [CUSTOMIZE: Operations Team Name] |
-| **Environment** | [CUSTOMIZE: Stack Details; Production/Staging/Development] |
+|| Please keep the following information updated. |
+| :--- | :--- |
+| **Owner:** | [CUSTOMIZE: Operations Team Name] |
+| **Environment:** | [CUSTOMIZE: Stack Details; Production/Staging/Development] |
+| **Next Review:** | [CUSTOMIZE: Date] |
 
 ---
 
