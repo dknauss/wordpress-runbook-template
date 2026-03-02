@@ -1,10 +1,18 @@
-# WordPress Operations Runbook for [CUSTOMIZE: Domain/Instance/Environment] 
+# WordPress Operations Runbook for [CUSTOMIZE: Domain/Instance] 
 
-**Version:** [CUSTOMIZE: Operations Team Name] 
-**Last Updated:** [CUSTOMIZE: Date] 
-**Next Review:** [CUSTOMIZE: Date] 
-**Owner:** [CUSTOMIZE: Operations Team Name]  
-**Environment:** [CUSTOMIZE: Stack Details; Production/Staging/Development]
+|**Environment:**|
+|:----------------------------------------------|
+|[Stack/Details]|  
+
+<br /><br />
+
+|**Version:**|**Last Updated:**|**Next Review:**|
+|:-----------|:----------------|:---------------|
+|   #.#.#    |  [YYYY-MM-DD]   |  [YYYY-MM-DD]  |
+
+|**Owner:**|               
+|:----------------------------------------------|
+|[Team/Lead]|
 
 ---
 
