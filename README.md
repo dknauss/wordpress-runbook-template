@@ -2,6 +2,14 @@
 
 A comprehensive operations runbook template for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. This template provides the structure and procedures for creating a site-specific runbook tailored to your environment — fill in your configuration details, remove sections that don't apply, and you have a complete operational reference for your team.
 
+## Document Purpose
+
+This is an **operational reference** — it answers **"how do I do it?"**
+
+Every procedure includes numbered steps, expected outcomes, rollback instructions, and copy-pasteable code. The target reader is a sysadmin or engineer responding to an incident, deploying an update, or setting up a new environment and needing exact commands and configurations to follow.
+
+This document is **not** an audit checklist (use the [Security Benchmark](https://github.com/dknauss/wp-security-benchmark) for that), **not** an architectural guide (use the [Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)), and **not** a writing reference (use the [Style Guide](https://github.com/dknauss/wp-security-style-guide)).
+
 ## Audience
 
 This template is intended for system administrators, DevOps engineers, site reliability teams, and WordPress developers responsible for the uptime, security, and operational integrity of WordPress deployments. It assumes a self-hosted or VPS-based environment with server-level access, though much of the content applies to any WordPress installation.
@@ -69,9 +77,13 @@ The plugin complements this template: use this document as the comprehensive ope
 
 ## Related Documents
 
-- **[WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark)** — Prescriptive, auditable hardening controls for the full WordPress stack. Use for compliance verification and the security hardening sections of your runbook.
-- **[WordPress Security Architecture and Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)** — Enterprise-focused security architecture covering threat landscape, OWASP Top 10, server hardening, authentication, supply chain, and incident response.
-- **[WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide)** — Principles, terminology, and formatting conventions for writing about WordPress security.
+This runbook is one of four complementary documents covering WordPress security from different angles:
+
+| Document | Purpose |
+|---|---|
+| **[WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark)** | Audit checklist — "what to verify." Prescriptive, auditable hardening controls for compliance verification. |
+| **[WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)** | Advisory — "what to implement." Enterprise-focused security architecture and threat mitigation. |
+| **[WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide)** | Editorial — "how to write about it." Terminology, voice, and formatting conventions for security communication. |
 
 ## Contributing
 
