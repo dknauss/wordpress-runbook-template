@@ -521,11 +521,14 @@ rm /home/wordpress/public_html/license.txt
 Add to `wp-config.php`:
 
 ```php
-// Disable theme and plugin file editor (CRITICAL for security)
-define('DISALLOW_FILE_MODS', true);
+// Baseline: disable the built-in theme/plugin editor
+define('DISALLOW_FILE_EDIT', true);
+
+// Optional hardened profile: disable all Dashboard file modifications
+// define('DISALLOW_FILE_MODS', true);
 ```
 
-> **WARNING:** When `DISALLOW_FILE_MODS` is enabled, users cannot edit files through the WordPress admin panel. Updates must go through deployment.
+> **WARNING:** If you enable `DISALLOW_FILE_MODS`, Dashboard-based plugin/theme installs and updates are disabled. Use only with a documented deployment/update pipeline.
 
 **Disable XML-RPC (Recommended):**
 
@@ -542,9 +545,6 @@ See Section 5.4 for REST API management and the [WordPress Security Hardening Gu
 ```nginx
 # Prevent MIME type sniffing
 add_header X-Content-Type-Options "nosniff" always;
-
-# Enable XSS protection in older browsers
-add_header X-XSS-Protection "1; mode=block" always;
 
 # Clickjacking protection - prevent embedding in frames
 add_header X-Frame-Options "SAMEORIGIN" always;
@@ -594,22 +594,20 @@ add_filter( 'xmlrpc_enabled', '__return_false' );
 
 Additionally, disable trackbacks and pingbacks in **Settings → Discussion** by unchecking "Allow link notifications from other blogs (pingbacks and trackbacks) on new posts."
 
-**Restrict REST API Access:**
+**Scope REST API Exposure (Recommended):**
 
-Require authentication for unauthenticated REST API requests via a must-use plugin (`wp-content/mu-plugins/restrict-rest-api.php`):
+Keep required public endpoints available (for example, posts on public sites) and restrict only sensitive routes.
+
+Example must-use plugin (`wp-content/mu-plugins/restrict-rest-users.php`) to reduce user-enumeration exposure:
 ```php
-add_filter( 'rest_authentication_errors', function( $result ) {
-    if ( ! empty( $result ) ) {
-        return $result;
-    }
-    if ( ! is_user_logged_in() ) {
-        return new WP_Error( 'rest_not_logged_in', 'REST API requires authentication.', array( 'status' => 401 ) );
-    }
-    return $result;
-});
+add_filter( 'rest_endpoints', function( $endpoints ) {
+    unset( $endpoints['/wp/v2/users'] );
+    unset( $endpoints['/wp/v2/users/(?P<id>[\d]+)'] );
+    return $endpoints;
+} );
 ```
 
-> **WARNING:** This will break decoupled (headless) installations or plugins that rely on unauthenticated REST API access. For headless architectures, allowlist only the specific routes needed by the front-end application.
+> **WARNING:** Avoid blanket REST API authentication requirements unless architecture explicitly requires it. Global blocking often breaks headless front ends, plugins, and theme features.
 
 **Monitor REST API Usage:**
 
@@ -1065,8 +1063,8 @@ tail -20 /var/log/php-errors.log
     create 0640 www-data adm
     sharedscripts
     postrotate
-        if [ -f /var/run/nginx.pid ]; then
-            kill -USR1 `cat /var/run/nginx.pid`
+        if [ -f /run/nginx.pid ]; then
+            kill -USR1 $(cat /run/nginx.pid)
         fi
     endscript
 }
@@ -2229,7 +2227,7 @@ Date: [Date]
 4. **Restore Permissions**
    ```bash
    # Set correct ownership
-   sudo chown -R www-data:www-data /home/wordpress/public_html
+   sudo chown -R [CUSTOMIZE: wp_user]:www-data /home/wordpress/public_html
    
    # Set correct permissions (see Appendix A)
    find /home/wordpress/public_html -type f -exec chmod 644 {} \;
@@ -2397,7 +2395,7 @@ Date: [Date]
    
    # Create WordPress directory
    sudo mkdir -p /home/wordpress/public_html
-   sudo chown www-data:www-data /home/wordpress/public_html
+   sudo chown [CUSTOMIZE: wp_user]:www-data /home/wordpress/public_html
    ```
 
 2. **Backup Current Site**
@@ -2475,16 +2473,16 @@ Proper file permissions are critical for security. WordPress files should not be
 
 | Path | Type | Owner | Group | Mode | Purpose |
 |------|------|-------|-------|------|---------|
-| `/home/wordpress/public_html/` | dir | www-data | www-data | 755 | Web root - allow read/execute |
-| `/home/wordpress/public_html/*.php` | file | www-data | www-data | 644 | PHP files - not world-writable |
-| `/home/wordpress/public_html/wp-config.php` | file | www-data | www-data | 600 | Config - owner only readable |
-| `/home/wordpress/public_html/wp-content/` | dir | www-data | www-data | 755 | Content directory |
-| `/home/wordpress/public_html/wp-content/uploads/` | dir | www-data | www-data | 755 | User uploads |
-| `/home/wordpress/public_html/wp-content/uploads/*` | file | www-data | www-data | 644 | Uploaded files |
-| `/home/wordpress/public_html/wp-content/plugins/` | dir | www-data | www-data | 755 | Plugins directory |
-| `/home/wordpress/public_html/wp-content/themes/` | dir | www-data | www-data | 755 | Themes directory |
-| `/home/wordpress/public_html/.htaccess` | file | www-data | www-data | 644 | Rewrite rules |
-| `/home/wordpress/backup/` | dir | www-data | www-data | 700 | Backups - owner only |
+| `/home/wordpress/public_html/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Web root - readable by web server, owned by site user |
+| `/home/wordpress/public_html/*.php` | file | [CUSTOMIZE: wp_user] | www-data | 644 | PHP files - not world-writable |
+| `/home/wordpress/public_html/wp-config.php` | file | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 400/600 | Config - most restrictive practical mode |
+| `/home/wordpress/public_html/wp-content/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Content directory |
+| `/home/wordpress/public_html/wp-content/uploads/` | dir | [CUSTOMIZE: wp_user] | www-data | 755/775 | User uploads (write as needed) |
+| `/home/wordpress/public_html/wp-content/uploads/*` | file | [CUSTOMIZE: wp_user] | www-data | 644/664 | Uploaded files |
+| `/home/wordpress/public_html/wp-content/plugins/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Plugins directory |
+| `/home/wordpress/public_html/wp-content/themes/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Themes directory |
+| `/home/wordpress/public_html/.htaccess` | file | [CUSTOMIZE: wp_user] | www-data | 644 | Rewrite rules |
+| `/home/wordpress/backup/` | dir | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 700 | Backups - owner only |
 
 ### A.2 Permission Reset Script
 
@@ -2498,8 +2496,8 @@ Use this script to fix permissions after issues or new installations:
 set -e
 
 WP_ROOT="[CUSTOMIZE: /home/wordpress/public_html]"
-WP_OWNER="www-data"
-WP_GROUP="www-data"
+WP_OWNER="[CUSTOMIZE: wp_user]"
+WP_GROUP="www-data"  # web server group
 
 if [ ! -d "$WP_ROOT" ]; then
     echo "Error: WordPress directory not found at $WP_ROOT"
@@ -2595,18 +2593,14 @@ define('NONCE_SALT',       'put your unique phrase here');
 
 ### B.3 Security Constants
 
-> **WARNING:** The `DISALLOW_FILE_MODS` constant prevents file editing through WordPress admin. When enabled, all updates must go through deployment processes.
+> **WARNING:** `DISALLOW_FILE_EDIT` is the baseline recommendation. Use `DISALLOW_FILE_MODS` only when updates are handled outside the WordPress Dashboard.
 
 ```php
-// Disable file editing (REQUIRED in production)
-define('DISALLOW_FILE_MODS', true);
+// Baseline: disable built-in theme/plugin editor in wp-admin
+define('DISALLOW_FILE_EDIT', true);
 
-// Disable plugin/theme installation
-define('DISALLOW_FILE_MODS', true);  // Includes installation
-define('DISALLOW_PLUGIN_EDITING', true);  // If above is not used
-
-// Disable plugin deactivation
-define('DISALLOW_PLUGIN_ACTIVATION', true);
+// Optional hardened profile: disable plugin/theme installs and updates in Dashboard
+// define('DISALLOW_FILE_MODS', true);
 
 // Security: Disable XML-RPC — block at web server level (see Section 5.4)
 // or use a must-use plugin: add_filter('xmlrpc_enabled', '__return_false');
@@ -2614,8 +2608,8 @@ define('DISALLOW_PLUGIN_ACTIVATION', true);
 // Security: Force HTTPS
 define('FORCE_SSL_ADMIN', true);
 
-// Security: Restrict REST API to authenticated users (optional)
-// Requires a must-use plugin — see Section 5.4
+// Security: REST API policy should be route-scoped, not globally blocked
+// See Section 5.4 for endpoint-specific examples.
 ```
 
 ### B.4 Debugging Constants
@@ -2732,7 +2726,7 @@ define('NONCE_SALT',       '[CUSTOMIZE: unique-key]');
 // ============================================================
 // DATABASE TABLE PREFIX
 // ============================================================
-$table_prefix = 'wp_';
+$table_prefix = 'wp_';  // Default; non-default prefixes are optional obscurity control
 
 // ============================================================
 // LANGUAGE AND LOCALE
@@ -2742,7 +2736,8 @@ define('WPLANG', 'en_US');
 // ============================================================
 // WORDPRESS SECURITY
 // ============================================================
-define('DISALLOW_FILE_MODS', true);  // Disable file editor and plugin/theme installation
+define('DISALLOW_FILE_EDIT', true);  // Baseline: disable built-in file editor
+// define('DISALLOW_FILE_MODS', true);  // Optional hardened profile; requires external update workflow
 define('FORCE_SSL_ADMIN', true);     // Require HTTPS for admin
 // XML-RPC: disable at web server level or via must-use plugin
 // (see Section 5.4 and WordPress Security Benchmark §4.4)
@@ -2808,7 +2803,7 @@ This section documents all updates to this runbook and corresponding infrastruct
 - Detailed wp-config.php guidance (Appendix B)
 
 **Breaking Changes:**
-- Enforced `DISALLOW_FILE_MODS = true` for all installations
+- Set `DISALLOW_FILE_EDIT = true` as baseline; `DISALLOW_FILE_MODS` moved to optional hardened profile
 - Changed default post revision limit to 5 (from unlimited)
 - Updated PHP minimum version requirement to 8.1+
 
@@ -2845,6 +2840,22 @@ This section documents all updates to this runbook and corresponding infrastruct
 - Basic monitoring
 
 ---
+
+
+## Appendix D: Deprecated and Invalid Constants Guardrail
+
+Do not add these symbols to `wp-config.php` hardening templates:
+
+- `FORCE_SSL_LOGIN` (deprecated)
+- `DISALLOW_PLUGIN_EDITING` (not a core constant)
+- `DISALLOW_PLUGIN_ACTIVATION` (not a core constant)
+- `SECURE_LOGGED_IN_COOKIE` (not a core constant)
+- `define('XMLRPC_REQUEST', false)` (`XMLRPC_REQUEST` is request-context only)
+
+Use `DISALLOW_FILE_EDIT` as baseline, and use `DISALLOW_FILE_MODS` only when deployment/update workflows are externalized.
+
+---
+
 
 ## Quick Reference Card (Printable)
 
