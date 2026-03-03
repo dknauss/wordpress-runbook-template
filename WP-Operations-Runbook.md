@@ -44,7 +44,7 @@ Use this table to quickly find solutions to common issues.
 | Need to restore from backup | Section 11.2 | Check backup integrity first |
 | WordPress cannot write to disk | Appendix A | `wp server list --format=csv` |
 | SSL certificate expired | Section 3.5 | `openssl x509 -in [cert] -noout -text` |
-| Users locked out | Section 5.3 | `wp user list --format=table` |
+| Users locked out | Section 5.5 | `wp user list --role=administrator --format=table` |
 | Hacked/malware suspected | Section 10.3 | Isolate site immediately, see escalation |
 | Database won't start | Section 11.2 | `systemctl status mysql` |
 
@@ -174,7 +174,7 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 | Service | Version | Port | User | Config Path | Log Path |
 |---------|---------|------|------|-------------|----------|
 | **Nginx** | [CUSTOMIZE: 1.24+] | 80, 443 | `www-data` | `/etc/nginx/nginx.conf` | `/var/log/nginx/` |
-| **PHP-FPM** | [CUSTOMIZE: 8.1+] | 9000 (socket) | `www-data` | `/etc/php/8.1/fpm/php.ini` | `/var/log/php*.log` |
+| **PHP-FPM** | [CUSTOMIZE: 8.2+] | 9000 (socket) | `www-data` | `/etc/php/[CUSTOMIZE: 8.x]/fpm/php.ini` | `/var/log/php*.log` |
 | **MySQL** | [CUSTOMIZE: 8.0+] | 3306 (local) | `mysql` | `/etc/mysql/mysql.conf.d/mysqld.cnf` | `/var/log/mysql/error.log` |
 | **Redis** | [CUSTOMIZE: 7.0+] | 6379 | `redis` | `/etc/redis/redis.conf` | `/var/log/redis/redis-server.log` |
 
@@ -619,7 +619,48 @@ grep "wp-json" /var/log/nginx/access.log | tail -20
 awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -20
 ```
 
-### 5.5 File Integrity Monitoring (FIM)
+### 5.5 Administrator Two-Factor Authentication (2FA)
+
+**Objective:** Require 2FA for all administrator-capable accounts and maintain a documented break-glass recovery path.
+
+**Choose and Standardize One 2FA Plugin:**
+
+- [CUSTOMIZE: 2fa_plugin_slug] (for example, `wp-2fa` or `two-factor`)
+
+**Implementation Steps:**
+
+1. Install and activate the approved 2FA plugin:
+
+```bash
+wp plugin install [CUSTOMIZE: 2fa_plugin_slug] --activate
+```
+
+2. In plugin settings, enforce 2FA for `administrator` (and any additional privileged roles).
+
+3. Enroll all administrator accounts and store backup recovery codes in the approved password vault.
+
+4. Verify operational state:
+
+```bash
+wp plugin is-active [CUSTOMIZE: 2fa_plugin_slug] && echo "2FA plugin active"
+wp user list --role=administrator --fields=ID,user_login,user_email --format=table
+```
+
+5. Document exceptions and break-glass approvals (owner, approver, expiry, and rollback steps).
+
+**Emergency Recovery (temporary):**
+
+```bash
+# Use only during approved incident response
+wp plugin deactivate [CUSTOMIZE: 2fa_plugin_slug]
+
+# Re-enable immediately after account recovery
+wp plugin activate [CUSTOMIZE: 2fa_plugin_slug]
+```
+
+> **WARNING:** Any bypass window must be ticketed, time-bounded, and reviewed after closure.
+
+### 5.6 File Integrity Monitoring (FIM)
 
 **Setup AIDE (Advanced Intrusion Detection Environment):**
 
@@ -870,6 +911,8 @@ wp transient delete --expired --all
 
 > **WARNING:** Major PHP version changes can break plugins/themes. Always test on staging first.
 
+> **NOTE:** Replace `8.2` below with your target PHP version (for example, `8.3`) and keep package names, FPM service, pool path, and socket references consistent.
+
 **Prerequisites:**
 - All plugins compatible with new PHP version (check WordPress.org)
 - All themes compatible
@@ -1090,7 +1133,7 @@ tail -20 /var/log/php-errors.log
     postrotate
         /usr/lib/php/php-fpm-checkconf > /dev/null 2>&1 || true
         if [ $? -eq 0 ]; then
-            systemctl reload php8.1-fpm > /dev/null 2>&1 || true
+            systemctl reload [CUSTOMIZE: php_fpm_service] > /dev/null 2>&1 || true
         fi
     endscript
 }
@@ -1171,7 +1214,7 @@ RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null $SITE_URL)
 if [ "$RESPONSE" != "200" ]; then
     echo "ALERT: Site returned $RESPONSE at $(date)" | mail -s "WordPress Site Down" root@example.com
     # Attempt to restart PHP-FPM
-    systemctl restart php8.1-fpm
+    systemctl restart [CUSTOMIZE: php_fpm_service]
 fi
 
 # Check database
@@ -1774,7 +1817,7 @@ wp search-replace "old" "new" --post_id=123,456,789
    ```bash
    # Check if services are running
    systemctl status nginx
-   systemctl status php8.1-fpm
+   systemctl status [CUSTOMIZE: php_fpm_service]
    systemctl status mysql
    
    # Check server load
@@ -1842,7 +1885,7 @@ wp search-replace "old" "new" --post_id=123,456,789
    # Restart in this order
    sudo systemctl restart mysql
    sleep 5
-   sudo systemctl restart php8.1-fpm
+   sudo systemctl restart [CUSTOMIZE: php_fpm_service]
    sleep 5
    sudo systemctl restart nginx
    
@@ -2232,7 +2275,7 @@ Date: [Date]
    # Set correct permissions (see Appendix A)
    find /home/wordpress/public_html -type f -exec chmod 644 {} \;
    find /home/wordpress/public_html -type d -exec chmod 755 {} \;
-   chmod 600 /home/wordpress/public_html/wp-config.php
+   chmod 400 /home/wordpress/public_html/wp-config.php
    ```
 
 5. **Restore Configuration Files**
@@ -2281,7 +2324,7 @@ Date: [Date]
    
    # Restart services
    sudo systemctl restart nginx
-   sudo systemctl restart php8.1-fpm
+   sudo systemctl restart [CUSTOMIZE: php_fpm_service]
    
    # Test site
    curl -I https://[CUSTOMIZE: example.com]
@@ -2389,7 +2432,7 @@ Date: [Date]
    ```bash
    # Verify all services running
    systemctl status nginx
-   systemctl status php8.1-fpm
+   systemctl status [CUSTOMIZE: php_fpm_service]
    systemctl status mysql
    systemctl status redis
    
@@ -2432,7 +2475,6 @@ Date: [Date]
    scp /etc/letsencrypt/live/[CUSTOMIZE: example.com]/* \
      root@new-server:/etc/letsencrypt/live/[CUSTOMIZE: example.com]/
    ```
-
 6. **Test on New Server**
    ```bash
    # Test via IP address (before DNS updates)
@@ -2475,7 +2517,7 @@ Proper file permissions are critical for security. WordPress files should not be
 |------|------|-------|-------|------|---------|
 | `/home/wordpress/public_html/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Web root - readable by web server, owned by site user |
 | `/home/wordpress/public_html/*.php` | file | [CUSTOMIZE: wp_user] | www-data | 644 | PHP files - not world-writable |
-| `/home/wordpress/public_html/wp-config.php` | file | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 400/600 | Config - most restrictive practical mode |
+| `/home/wordpress/public_html/wp-config.php` | file | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 400 (600 temporary) | Config - most restrictive practical mode |
 | `/home/wordpress/public_html/wp-content/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Content directory |
 | `/home/wordpress/public_html/wp-content/uploads/` | dir | [CUSTOMIZE: wp_user] | www-data | 755/775 | User uploads (write as needed) |
 | `/home/wordpress/public_html/wp-content/uploads/*` | file | [CUSTOMIZE: wp_user] | www-data | 644/664 | Uploaded files |
@@ -2514,9 +2556,9 @@ find "$WP_ROOT" -type d -exec chmod 755 {} \;
 echo "Setting file permissions to 644..."
 find "$WP_ROOT" -type f -exec chmod 644 {} \;
 
-# wp-config.php: 600 (rw-------)
-echo "Setting wp-config.php to 600..."
-chmod 600 "$WP_ROOT/wp-config.php"
+# wp-config.php: 400 (r--------) steady-state
+echo "Setting wp-config.php to 400 (use 600 temporarily only during managed edits)..."
+chmod 400 "$WP_ROOT/wp-config.php"
 
 # .htaccess: 644
 echo "Setting .htaccess to 644..."
@@ -2888,7 +2930,7 @@ Database:                    MySQL [CUSTOMIZE: wordpress_db]
 
 SERVICE COMMANDS:
 Restart Nginx:               sudo systemctl restart nginx
-Restart PHP-FPM:             sudo systemctl restart php8.1-fpm
+Restart PHP-FPM:             sudo systemctl restart [CUSTOMIZE: php_fpm_service]
 Restart MySQL:               sudo systemctl restart mysql
 Check service status:        sudo systemctl status [service]
 
