@@ -1,10 +1,12 @@
 # WordPress Operations Runbook Template
 
-A comprehensive operations runbook template for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. This template provides the structure and procedures for creating a site-specific runbook tailored to your environment — fill in your configuration details, remove sections that don't apply, and you have a complete operational reference for your team.
+A comprehensive operations runbook template for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. This template provides the structure and procedures for creating a site-specific runbook tailored to your environment — fill in your configuration details, remove sections that don't apply, rename/replace [TEMPLATE/CUSTOMIZE] references, and you have a complete operational reference for your team. 
+
+NB: The Version History table (§1.4) and Changelog (Appendix C) refer to the history of this document as a template. Reset/remove this information and add your own history of revisions to your operational document.
 
 ## Document Purpose
 
-This is an **operational reference** — it answers **"how do I do it?"**
+This is a template and model for creating an **operational reference** — it answers **"how do I do it?"** — for a specific WordPress installation.
 
 Every procedure includes numbered steps, expected outcomes, rollback instructions, and copy-pasteable code. The target reader is a sysadmin or engineer responding to an incident, deploying an update, or setting up a new environment and needing exact commands and configurations to follow.
 
