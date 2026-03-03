@@ -602,9 +602,11 @@ sudo systemctl reload nginx
 curl -I https://[CUSTOMIZE: example.com] | grep -i "X-\|Strict\|Content-Security"
 ```
 
+> **NOTE:** See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §1.2 for the complete audit procedure, rationale for each header, and Level 2 guidance on removing `unsafe-inline` from CSP.
+
 ### 5.4 REST API and XML-RPC Management
 
-> **NOTE:** For comprehensive REST API security guidance (authentication methods, permission callbacks, CORS, data validation), see the [WordPress Security Hardening Guide §7.5](https://github.com/dknauss/wp-security-hardening-guide). For prescriptive benchmarks on rate limiting and unauthenticated access, see [WordPress Security Benchmark §1.5 and §5.6](https://github.com/dknauss/wp-security-benchmark).
+> **NOTE:** For comprehensive REST API security guidance (authentication methods, permission callbacks, CORS, data validation), see the [WordPress Security Hardening Guide §7.5](https://github.com/dknauss/wp-security-hardening-guide). For prescriptive benchmarks on rate limiting, unauthenticated access, XML-RPC disablement, and user enumeration prevention, see [WordPress Security Benchmark §1.5, §4.4, §5.4, and §5.6](https://github.com/dknauss/wp-security-benchmark).
 
 **Disable XML-RPC (recommended):**
 
@@ -780,6 +782,8 @@ Lifecycle metadata for critical maintenance procedures is tracked in [Appendix E
 
 **Purpose:**
 Apply WordPress core updates with a validated backup and post-update checks, minimizing downtime and regression risk.
+
+See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §4.5 for the configuration audit and rationale behind automatic core update settings.
 
 **Prerequisites:**
 - Database backup created
@@ -2005,19 +2009,22 @@ Lifecycle metadata for incident response procedures is tracked in [Appendix E](#
 - WP-CLI 2.5+ installed and accessible in `$PATH` (verify: `wp cli version`)
 - Access to monitoring dashboards and log aggregation
 - Contact list for on-call personnel (see [Section 10.4](#104-incident-roles-and-escalation-path))
+- Verified recent backup exists and restore path is documented (see [Section 11.2](#112-full-site-restore-from-backup))
 
 ### 10.1 Severity Classification
 
-| Severity | Impact | Response Time | Example |
-|----------|--------|----------------|---------|
-| **Critical (P1)** | Site completely down or major data loss | 15 minutes | Database corruption, ransomware, all users locked out |
-| **High (P2)** | Core functionality broken, partial outage | 30 minutes | Plugin causing 500 errors, login broken, media not loading |
-| **Medium (P3)** | Non-critical feature broken or degraded | 4 hours | Search not working, theme display issues |
-| **Low (P4)** | Minor issues, cosmetic or UX | 1-2 business days | Typo, formatting issue, slow report generation |
+| Severity | Impact | Response Time | Example | Relevant Playbook |
+|----------|--------|----------------|---------|-------------------|
+| **Critical (P1)** | Site completely down or major data loss | 15 minutes | Database corruption, ransomware, all users locked out | [§10.2](#102-site-down--500-error-triage), [§10.3](#103-security-breach-response) |
+| **High (P2)** | Core functionality broken, partial outage | 30 minutes | Plugin causing 500 errors, login broken, media not loading | [§10.2](#102-site-down--500-error-triage), [§10.5](#105-performance-degradation) |
+| **Medium (P3)** | Non-critical feature broken or degraded | 4 hours | Search not working, theme display issues | [§10.5](#105-performance-degradation) |
+| **Low (P4)** | Minor issues, cosmetic or UX | 1-2 business days | Typo, formatting issue, slow report generation | — |
 
 ### 10.2 Site Down / 500 Error Triage
 
-**Time Estimate:** 5-10 minutes to identify root cause
+**Time Estimate:** 5-15 minutes to identify root cause (longer if plugin isolation or database repair is required)
+
+**Use this playbook when:** uptime monitor fires a 5xx alert, or users report the site is unreachable.
 
 **Alert Meaning:**
 `500/502/503` on the public site or admin endpoint indicates the WordPress stack is degraded or unavailable (application, PHP-FPM, database, or host-level failure).
@@ -2033,7 +2040,13 @@ Users may be unable to read content, authenticate, publish, or complete transact
    curl -I https://[CUSTOMIZE: example.com]/wp-admin/
    curl -s -w "%{http_code}\n" -o /dev/null https://[CUSTOMIZE: example.com]
    ```
-2. **Check service health and host resources**
+2. **Check CDN/WAF layer (if applicable)**
+   ```bash
+   # If using a CDN or WAF, check for edge-layer errors:
+   curl -sI https://[CUSTOMIZE: example.com] | grep -iE "cf-ray|server|x-cache"
+   # Check CDN status page: [CUSTOMIZE: https://www.cloudflarestatus.com/]
+   ```
+3. **Check service health and host resources**
    ```bash
    systemctl status nginx
    systemctl status [CUSTOMIZE: php_fpm_service]
@@ -2042,26 +2055,27 @@ Users may be unable to read content, authenticate, publish, or complete transact
    free -h
    df -h | grep -E "^/dev|^Filesystem"
    ```
-3. **Inspect recent errors**
+4. **Inspect recent errors**
    ```bash
    tail -30 /var/log/php-errors.log
    tail -30 /var/log/nginx/error.log
    tail -30 /var/log/mysql/error.log
-   tail -30 wp-content/debug.log
+   tail -30 [CUSTOMIZE: /home/wordpress/public_html]/wp-content/debug.log
    ```
-4. **Test plugin isolation**
+5. **Test plugin isolation**
    ```bash
    wp plugin list --status=active --fields=name,status,version --format=table
+   # WARNING: Deactivates ALL plugins including security, caching, and e-commerce.
+   # On production with active transactions, consider testing a single suspect plugin first.
+   # Use only when service is already fully down.
    wp plugin deactivate --all
    curl -I https://[CUSTOMIZE: example.com]
    ```
-5. **Validate database state**
+6. **Validate database state**
    ```bash
    wp db check
-   wp db repair
-   wp db optimize
    ```
-6. **Check PHP memory constraints**
+7. **Check PHP memory constraints**
    ```bash
    php -r "echo ini_get('memory_limit').PHP_EOL;"
    ```
@@ -2082,6 +2096,11 @@ Users may be unable to read content, authenticate, publish, or complete transact
    define('WP_MEMORY_LIMIT', '256M');
    define('WP_MAX_MEMORY_LIMIT', '512M');
    ```
+4. If `wp db check` reports errors, repair and optimize:
+   ```bash
+   wp db repair
+   wp db optimize
+   ```
 
 **Escalation:**
 
@@ -2098,11 +2117,13 @@ tail -20 /var/log/nginx/error.log
 tail -20 /var/log/php-errors.log
 ```
 
-Confirm admin login and at least one critical business workflow before closing incident.
+Confirm admin login and at least one critical business workflow (e.g., [CUSTOMIZE: test checkout, form submission, or user registration]) before closing incident.
 
 ### 10.3 Security Breach Response
 
 **Time Estimate:** 1-4 hours depending on scope
+
+**Use this playbook when:** security scanner detects malware, unexpected admin accounts appear, or the site redirects to an unknown domain.
 
 > **CRITICAL:** If breach is suspected, act immediately. Data loss and reputation damage increase with every minute of delay.
 
@@ -2141,20 +2162,25 @@ Escalation: [Your contact details]
    ```bash
    wp user list --format=table
    wp user list --role=administrator --format=table
-   find /home/wordpress -name "*.php" -type f -mtime -7 -ls
-   find /home/wordpress -name "shell.php" -o -name "admin.php" -o -name "tmp*.php"
+   find [CUSTOMIZE: /home/wordpress] -name "*.php" -type f -mtime -7 -ls
+   find [CUSTOMIZE: /home/wordpress] -name "shell.php" -o -name "admin.php" -o -name "tmp*.php"
+   # Check for unauthorized SSH keys (common persistence mechanism)
+   cat ~/.ssh/authorized_keys
+   find /home -name authorized_keys -exec ls -la {} \;
    ```
 3. **Capture forensic artifacts before cleanup**
    ```bash
+   mkdir -p /root/forensics
+   # For large sites, consider excluding wp-content/uploads or using incremental backup tooling
    tar -czf /root/forensics/breach-evidence-$(date +%Y%m%d-%H%M%S).tar.gz \
-     /home/wordpress/public_html
+     [CUSTOMIZE: /home/wordpress/public_html]
    wp db export /root/forensics/breach-evidence-db-$(date +%Y%m%d-%H%M%S).sql
    ```
 4. **Perform security scans**
    ```bash
    # Wordfence scans must be initiated through wp-admin > Wordfence > Scan
    # For CLI-based malware scanning, use dedicated tools:
-   clamscan -r /home/wordpress/public_html/
+   clamscan -r [CUSTOMIZE: /home/wordpress/public_html]/
    aide --check > /tmp/aide-report.txt
    ```
 
@@ -2224,7 +2250,7 @@ Then confirm:
 - site behavior is normal for at least one monitoring window;
 - incident report is completed in [Section 10.6](#106-post-incident-review).
 
-After all validation checks pass, initiate a full post-incident review per [Section 10.6](#106-post-incident-review), including affected-user notification and a security audit schedule.
+After all validation checks pass, initiate a full post-incident review per [Section 10.6](#106-post-incident-review), including affected-user notification and a security audit schedule. For affected-user communications, follow the editorial standards in the [WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide) §7 for vulnerability severity language and disclosure practices.
 
 ### 10.4 Incident Roles and Escalation Path
 
@@ -2266,9 +2292,13 @@ After all validation checks pass, initiate a full post-incident review per [Sect
    - Email: [CUSTOMIZE]
    - Slack: [CUSTOMIZE]
 
+> **Note:** The ordering above reflects escalation depth, not engagement sequence. The Incident Commander role is typically assumed by the On-Call SysAdmin at incident start and formally handed off when a senior IC is engaged.
+
 ### 10.5 Performance Degradation
 
 **Time Estimate:** 15-30 minutes to identify cause
+
+**Use this playbook when:** response time exceeds SLO thresholds, resource utilization alerts fire, or users report the site is slow.
 
 **Alert Meaning:**
 Latency, resource saturation, or query contention indicates degraded but not fully unavailable service. Common triggers: CPU sustained above 80%, memory above 90%, page load exceeding 2 seconds, or slow-query volume spikes.
@@ -2288,7 +2318,10 @@ Users experience slow page loads, failed submissions, and reduced admin producti
 2. **Identify primary bottleneck**
    ```bash
    tail -50 /var/log/mysql/slow.log
-   tail -1000 /var/log/nginx/access.log | awk '{print $NF}' | sort | uniq -c | sort -rn | head
+   # Group recent requests by HTTP status code (field $9 in combined log format)
+   tail -1000 /var/log/nginx/access.log | awk '{print $9}' | sort | uniq -c | sort -rn | head
+   # If using a custom log format with $request_time as last field, also check:
+   # tail -1000 /var/log/nginx/access.log | awk '{print $NF}' | sort -n | tail -20
    ```
 3. **Check common WordPress-specific causes**
    ```bash
@@ -2297,7 +2330,12 @@ Users experience slow page loads, failed submissions, and reduced admin producti
    wp post list --orderby=post_date --order=DESC --posts_per_page=100 --format=table
    wp cron event list
    ps aux | grep "wp cron"
+   # Check autoloaded options size (values over 1MB indicate bloat)
+   wp db query "SELECT SUM(LENGTH(option_value)) AS autoload_bytes FROM wp_options WHERE autoload = 'yes';"
+   wp db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload = 'yes' ORDER BY size DESC LIMIT 10;"
    ```
+
+If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §7.2 for guidance on replacing it with a system cron job, and [Section 6.6](#66-wordpress-cron-wp-cron-management) for the operational procedure.
 
 **Immediate Mitigation:**
 
@@ -2327,6 +2365,7 @@ Users experience slow page loads, failed submissions, and reduced admin producti
 time curl -s https://[CUSTOMIZE: example.com] > /dev/null
 uptime
 free -h
+# Expected: [CUSTOMIZE: max-age=3600 or similar — document your baseline cache-control header]
 curl -I https://[CUSTOMIZE: example.com] | grep -i Cache-Control
 ```
 
@@ -2375,6 +2414,7 @@ Confirm response time and host utilization return to baseline for at least 15 mi
 - [ ] [Task] - Owner: [Name] - Due: [Date]
 
 ## Participants
+<!-- Use role titles from Section 10.4: Incident Commander, Technical Lead, Communications Lead, Scribe -->
 - [Name] - [Role]
 - [Name] - [Role]
 
