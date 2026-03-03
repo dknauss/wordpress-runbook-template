@@ -277,8 +277,8 @@ wordpress-repo/
 │   ├── themes/              # Custom themes
 │   └── .gitignore
 ├── wp-config.php            # Template (no secrets)
-├── .htaccess               # Rewrite rules
-├── README.md               # Documentation
+├── .htaccess                # Rewrite rules
+├── README.md                # Documentation
 └── .git
 ```
 
