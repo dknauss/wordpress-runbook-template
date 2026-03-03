@@ -527,24 +527,13 @@ define('DISALLOW_FILE_MODS', true);
 
 > **WARNING:** When `DISALLOW_FILE_MODS` is enabled, users cannot edit files through the WordPress admin panel. Updates must go through deployment.
 
-**Limit XML-RPC and REST API:**
+**Disable XML-RPC (Recommended):**
 
-```bash
-# Disable XML-RPC (legacy remote publishing protocol)
-wp post-type update post --rest_enabled=true  # For REST API
+Block at the web server level (preferred). See Section 5.4 for details.
 
-# If not needed, disable entirely (add to wp-config.php):
-# define('XMLRPC_REQUEST', false);
+**Restrict REST API Access (Optional):**
 
-# Disable REST API for non-authenticated users (if not needed)
-# Add to functions.php of theme or plugin:
-# add_filter('rest_authentication_errors', function($result) {
-#     if (!is_user_logged_in() && !current_user_can('read')) {
-#         return new WP_Error('rest_not_permitted', 'REST API disabled for non-authenticated users', ['status' => 401]);
-#     }
-#     return $result;
-# });
-```
+See Section 5.4 for REST API management and the [WordPress Security Hardening Guide §7.5](https://github.com/dknauss/wp-security-hardening-guide) for comprehensive REST API security guidance.
 
 ### 5.3 HTTP Security Headers
 
@@ -586,48 +575,50 @@ curl -I https://[CUSTOMIZE: example.com] | grep -i "X-\|Strict\|Content-Security
 
 ### 5.4 REST API and XML-RPC Management
 
+> **NOTE:** For comprehensive REST API security guidance (authentication methods, permission callbacks, CORS, data validation), see the [WordPress Security Hardening Guide §7.5](https://github.com/dknauss/wp-security-hardening-guide). For prescriptive benchmarks on rate limiting and unauthenticated access, see [WordPress Security Benchmark §1.5 and §5.6](https://github.com/dknauss/wp-security-benchmark).
+
 **Disable XML-RPC (recommended):**
 
-Option 1: Add to `wp-config.php`:
-```php
-define('XMLRPC_REQUEST', false);
-```
-
-Option 2: Block in Nginx `/etc/nginx/conf.d/block-xmlrpc.conf`:
+Option 1 (preferred): Block at the web server level in Nginx `/etc/nginx/conf.d/block-xmlrpc.conf`:
 ```nginx
-location /xmlrpc.php {
+location = /xmlrpc.php {
     deny all;
-    access_log off;
-    log_not_found off;
+    return 403;
 }
 ```
 
-**Control REST API Access:**
-
-```bash
-# Check if REST API is enabled
-wp rest-api get-routes
-
-# Disable REST API for non-authenticated users (if not needed)
-# This requires custom code in your theme or plugin
+Option 2: Disable via a must-use plugin (`wp-content/mu-plugins/disable-xmlrpc.php`):
+```php
+add_filter( 'xmlrpc_enabled', '__return_false' );
 ```
 
-Add to theme's `functions.php`:
+Additionally, disable trackbacks and pingbacks in **Settings → Discussion** by unchecking "Allow link notifications from other blogs (pingbacks and trackbacks) on new posts."
+
+**Restrict REST API Access:**
+
+Require authentication for unauthenticated REST API requests via a must-use plugin (`wp-content/mu-plugins/restrict-rest-api.php`):
 ```php
-// Require authentication for REST API (if not needed publicly)
-add_filter('rest_authentication_errors', function($result) {
-    if (!is_user_logged_in()) {
-        return new WP_Error('rest_not_authenticated', 'REST API requires authentication', ['status' => 401]);
+add_filter( 'rest_authentication_errors', function( $result ) {
+    if ( ! empty( $result ) ) {
+        return $result;
+    }
+    if ( ! is_user_logged_in() ) {
+        return new WP_Error( 'rest_not_logged_in', 'REST API requires authentication.', array( 'status' => 401 ) );
     }
     return $result;
 });
 ```
+
+> **WARNING:** This will break decoupled (headless) installations or plugins that rely on unauthenticated REST API access. For headless architectures, allowlist only the specific routes needed by the front-end application.
 
 **Monitor REST API Usage:**
 
 ```bash
 # Check Nginx logs for REST API calls
 grep "wp-json" /var/log/nginx/access.log | tail -20
+
+# Check for high-volume API callers
+awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -20
 ```
 
 ### 5.5 File Integrity Monitoring (FIM)
@@ -986,16 +977,27 @@ Add to `wp-config.php`:
 define('DISABLE_WP_CRON', true);
 ```
 
-**Use System Cron Instead:**
+**Use System Cron Instead (WP-CLI):**
 
 Add to system crontab:
 ```bash
-# Run WordPress cron every 5 minutes
-*/5 * * * * curl -s https://[CUSTOMIZE: example.com]/wp-cron.php?doing_wp_cron > /dev/null 2>&1
-
-# Or using WP-CLI (better)
-*/5 * * * * wp cron event run --due-now --allow-root
+# Run WordPress cron every 5 minutes using WP-CLI
+*/5 * * * * cd /home/wordpress/public_html && wp cron event run --due-now > /dev/null 2>&1
 ```
+
+**Block Direct Access to wp-cron.php:**
+
+Once system cron is configured, block external access to `wp-cron.php` at the web server level. WP-CLI executes PHP directly and does not use HTTP.
+
+For Nginx:
+```nginx
+location = /wp-cron.php {
+    deny all;
+    return 403;
+}
+```
+
+> **NOTE:** Do not use `curl` to hit `wp-cron.php` over HTTP as the system cron replacement. The `wp-cron.php` endpoint should be blocked to prevent resource exhaustion attacks. Use WP-CLI directly instead. See [WordPress Security Benchmark §4.7](https://github.com/dknauss/wp-security-benchmark) for the full rationale.
 
 ### 6.7 Transactional Email Management
 
@@ -2606,23 +2608,14 @@ define('DISALLOW_PLUGIN_EDITING', true);  // If above is not used
 // Disable plugin deactivation
 define('DISALLOW_PLUGIN_ACTIVATION', true);
 
-// Security: Disable XML-RPC (legacy remote publishing)
-define('XMLRPC_REQUEST', false);
+// Security: Disable XML-RPC — block at web server level (see Section 5.4)
+// or use a must-use plugin: add_filter('xmlrpc_enabled', '__return_false');
 
 // Security: Force HTTPS
 define('FORCE_SSL_ADMIN', true);
-define('FORCE_SSL_LOGIN', true);
-
-// Security: Cookie settings
-define('SECURE_AUTH_COOKIE', true);  // Require HTTPS for auth cookie
-define('LOGGED_IN_COOKIE', true);    // Require HTTPS for logged-in cookie
-define('SECURE_LOGGED_IN_COOKIE', true);
 
 // Security: Restrict REST API to authenticated users (optional)
-// Requires custom code in functions.php to implement
-
-// Security: Disable file editor in admin
-define('DISALLOW_FILE_EDIT', true);  // No theme/plugin editor in wp-admin
+// Requires a must-use plugin — see Section 5.4
 ```
 
 ### B.4 Debugging Constants
@@ -2672,9 +2665,9 @@ define('WP_AUTO_UPDATE_CORE', 'minor');  // Auto-update minor versions only
 // Disable WordPress cron (use system cron instead)
 define('DISABLE_WP_CRON', true);
 
-// If using system cron, set alternate cron endpoint
-// This is handled via crontab entry:
-# */5 * * * * curl -s https://example.com/wp-cron.php?doing_wp_cron > /dev/null 2>&1
+// System cron replacement (add to crontab):
+// */5 * * * * cd /home/wordpress/public_html && wp cron event run --due-now > /dev/null 2>&1
+// Block wp-cron.php at the web server level — see Section 6.6
 ```
 
 ### B.7 Multisite Configuration (if applicable)
@@ -2749,10 +2742,10 @@ define('WPLANG', 'en_US');
 // ============================================================
 // WORDPRESS SECURITY
 // ============================================================
-define('DISALLOW_FILE_MODS', true);  // Disable file editor
+define('DISALLOW_FILE_MODS', true);  // Disable file editor and plugin/theme installation
 define('FORCE_SSL_ADMIN', true);     // Require HTTPS for admin
-define('FORCE_SSL_LOGIN', true);     // Require HTTPS for login
-define('XMLRPC_REQUEST', false);     // Disable XML-RPC
+// XML-RPC: disable at web server level or via must-use plugin
+// (see Section 5.4 and WordPress Security Benchmark §4.4)
 
 // ============================================================
 // PERFORMANCE & CACHING
@@ -2896,7 +2889,14 @@ ESCALATION PATH:
 
 ---
 
-## Related Documentation
+## Related Documents
+
+**Companion Security Documents:**
+-   **[WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark)** — Prescriptive configuration controls (Level 1/Level 2) for the full WordPress stack: web server, PHP, database, core, authentication, file system, logging, supply chain, AI, server access, and multisite. This runbook's hardening procedures implement many of the Benchmark's recommendations.
+-   **[WordPress Security Architecture and Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide)** — Enterprise-focused security architecture covering threat landscape, OWASP Top 10 mapping, server hardening, REST API security, authentication, supply chain, incident response, and AI security.
+-   **[WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide)** — Principles, terminology, and formatting conventions for writing about WordPress security.
+-   **[WordPress Security White Paper](https://wordpress.org/about/security/)** — The official upstream document describing WordPress core security architecture, maintained at WordPress.org.
+-   **[WordPress Advanced Administration: Security](https://developer.wordpress.org/advanced-administration/security/)** — The official WordPress documentation for security hardening, brute-force protection, HTTPS, backups, monitoring, and multi-factor authentication.
 
 **External References:**
 - [WordPress Official Documentation](https://wordpress.org/support/)
