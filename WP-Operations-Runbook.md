@@ -83,6 +83,7 @@ This document is intended for:
 | > **CUSTOMIZE:** | Settings specific to your environment |
 | **Expected:** | Anticipated output or result |
 | *italics* | Emphasis or variable placeholders |
+| **Procedure Metadata** | Required operational fields: `Owner`, `Last Tested`, `Review Cadence`, and `Last Drill Date` (for incident/disaster recovery procedures) |
 
 **Standard Procedure Block (for operational procedures):**
 
@@ -101,6 +102,16 @@ This document is intended for:
 | 2.0 | Feb 2026 | Comprehensive update with security hardening sections | [CUSTOMIZE] |
 | 1.5 | Aug 2025 | Added disaster recovery procedures | [CUSTOMIZE] |
 | 1.0 | Feb 2025 | Initial release | [CUSTOMIZE] |
+
+### 1.5 Freshness Guardrails
+
+Use the following controls to keep this runbook operationally reliable:
+
+1. Every critical procedure listed in Appendix E must have an assigned owner.
+2. `Last Tested` dates must be updated after execution in staging or production.
+3. `Review Cadence` is mandatory; stale procedures are considered non-compliant.
+4. Incident and disaster recovery procedures must include a `Last Drill Date`.
+5. If metadata is stale, escalate to the runbook owner before the next change window.
 
 ---
 
@@ -739,6 +750,8 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 ---
 
 ## Section 6: Routine Maintenance
+
+Lifecycle metadata for critical maintenance procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
 
 ### 6.1 Maintenance Calendar
 
@@ -1509,6 +1522,8 @@ sudo chown root:root /usr/local/bin/wordpress-backup.sh
 
 ## Section 8: Deployment Procedures
 
+Lifecycle metadata for deployment procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+
 ### 8.1 Code Deployment
 
 **Time Estimate:** 15-30 minutes (excluding QA window)
@@ -1984,6 +1999,8 @@ wp search-replace "old" "new" wp_posts
 
 ## Section 10: Incident Response
 
+Lifecycle metadata for incident response procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+
 ### 10.1 Severity Classification
 
 | Severity | Impact | Response Time | Example |
@@ -2173,7 +2190,16 @@ Then confirm:
 - site behavior is normal for at least one monitoring window;
 - incident report is completed in [Section 10.6](#106-post-incident-review).
 
-### 10.4 Escalation Path
+### 10.4 Incident Roles and Escalation Path
+
+**Incident Role Cards:**
+
+| Role | Primary Responsibilities | Handoff / Escalation Trigger |
+|------|--------------------------|------------------------------|
+| **Incident Commander** | Declares severity, sets priorities, owns timeline, and approves incident closure. | Escalate to management when SLA or customer impact thresholds are exceeded. |
+| **Technical Lead** | Runs diagnosis and mitigation steps, assigns technical tasks, confirms service recovery. | Escalate when root cause is unknown after initial triage window. |
+| **Communications Lead** | Sends internal/customer updates, keeps status page and stakeholders informed. | Escalate when legal/compliance review is required for messaging. |
+| **Scribe** | Maintains incident timeline, captures decisions/actions, records follow-ups for postmortem. | Escalate when critical timeline details are missing or conflicting. |
 
 **Contact Escalation Order:**
 
@@ -2322,6 +2348,8 @@ Date: [Date]
 ---
 
 ## Section 11: Disaster Recovery
+
+Lifecycle metadata for disaster recovery procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
 
 ### 11.1 Recovery Objectives
 
@@ -3025,6 +3053,23 @@ Do not add these symbols to `wp-config.php` hardening templates:
 - `WPLANG` (deprecated since WordPress 4.0; set language via Settings > General or WP-CLI `wp language core activate`)
 
 Use `DISALLOW_FILE_EDIT` as baseline, and use `DISALLOW_FILE_MODS` only when deployment/update workflows are externalized.
+
+## Appendix E: Procedure Ownership and Validation Matrix
+
+Use this matrix to track operational ownership and freshness for critical procedures.
+
+| Procedure | Owner | Last Tested | Review Cadence | Last Drill Date |
+|-----------|-------|-------------|----------------|-----------------|
+| **6.2 WordPress Core Updates** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Monthly | N/A |
+| **6.3 Plugin and Theme Updates** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Weekly | N/A |
+| **6.6 WordPress Cron Management** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Monthly | N/A |
+| **8.1 Code Deployment** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Monthly | N/A |
+| **8.2 Database Migration** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD / N/A] |
+| **8.3 Rollback Procedure** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD] |
+| **10.2 Site Down / 500 Triage** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD] |
+| **10.3 Security Breach Response** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD] |
+| **10.5 Performance Degradation** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD] |
+| **11.2 Full Site Restore from Backup** | [CUSTOMIZE: Role/Name] | [CUSTOMIZE: YYYY-MM-DD] | Quarterly | [CUSTOMIZE: YYYY-MM-DD] |
 
 ---
 
