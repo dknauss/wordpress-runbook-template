@@ -84,6 +84,16 @@ This document is intended for:
 | **Expected:** | Anticipated output or result |
 | *italics* | Emphasis or variable placeholders |
 
+**Standard Procedure Block (for operational procedures):**
+
+- **Purpose**
+- **Prerequisites**
+- **Commands**
+- **Expected Output**
+- **Rollback**
+- **Verification**
+- **Escalate If**
+
 ### 1.4 Version History
 
 | Version | Date | Changes | Author |
@@ -753,25 +763,28 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 
 **Time Estimate:** 30-45 minutes
 
+**Purpose:**
+Apply WordPress core updates with a validated backup and post-update checks, minimizing downtime and regression risk.
+
 **Prerequisites:**
 - Database backup created
 - No deploys in progress
 - Monitor available for next 30 minutes
 
-**Steps:**
+**Commands:**
 
-1. **Check Current Version**
+1. **Check Current Version and Available Updates**
    ```bash
    wp core version
    wp core check-update
    ```
 
-2. **Backup Database**
+2. **Create Pre-Update Database Backup**
    ```bash
    wp db export backup/pre-core-update-$(date +%Y%m%d-%H%M%S).sql
    ```
 
-3. **Update WordPress Core**
+3. **Update WordPress Core and Database Schema**
    ```bash
    # Check for available updates
    wp core check-update
@@ -783,28 +796,52 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    wp core update-db
    ```
 
-4. **Verify Update**
-   ```bash
-   # Confirm new version
-   wp core version
-   
-   # Check for errors in logs
-   tail -20 /var/log/php-errors.log
-   tail -20 wp-content/debug.log
-   ```
-
-5. **Clear Caches**
+4. **Flush Runtime Caches**
    ```bash
    wp cache flush
    # Plugin-dependent — uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    ```
 
-6. **Test Site**
-   - Verify homepage loads: `curl -I https://[CUSTOMIZE: example.com]`
-   - Test admin login
-   - Check dashboard for warnings
-   - Test critical user flows
+**Expected Output:**
+
+- `wp core check-update` returns no pending core updates.
+- `wp core version` reports the intended target version.
+- No new fatal errors in PHP, web server, or debug logs.
+
+**Rollback:**
+
+```bash
+# Restore the pre-update database backup
+wp db import backup/pre-core-update-YYYYMMDD-HHMMSS.sql
+
+# Revert application code to prior release if needed
+git checkout previous-release-tag
+```
+
+Use [Section 8.3](#83-rollback-procedure) for full rollback workflow.
+
+**Verification:**
+
+```bash
+# Confirm new version
+wp core version
+
+# Check for errors in logs
+tail -20 /var/log/php-errors.log
+tail -20 wp-content/debug.log
+
+# Verify site response
+curl -I https://[CUSTOMIZE: example.com]
+```
+
+Then verify admin login and critical user flows in browser.
+
+**Escalate If:**
+
+- Site returns non-2xx/3xx after update.
+- Fatal errors persist after cache flush and rollback.
+- Database upgrade (`wp core update-db`) fails.
 
 > **WARNING:** Minor updates (6.4.1 to 6.4.2) are generally safe. Major updates (6.3 to 6.4) should be tested on staging first.
 
@@ -812,12 +849,15 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 
 **Time Estimate:** 45-90 minutes depending on number of updates
 
+**Purpose:**
+Apply plugin and theme updates with controlled blast radius, rapid detection of regressions, and a clear rollback path.
+
 **Prerequisites:**
 - All updates tested on staging
 - Database backed up
 - Monitor available during and after
 
-**Steps:**
+**Commands:**
 
 1. **List Available Updates**
    ```bash
@@ -825,20 +865,20 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    wp theme list --format=table --fields=name,status,update
    ```
 
-2. **Backup Database**
+2. **Create Pre-Update Database Backup**
    ```bash
    wp db export backup/pre-plugin-update-$(date +%Y%m%d-%H%M%S).sql
    ```
 
-3. **Update Plugins (One by One)**
+3. **Update Plugins in Controlled Order**
    ```bash
-   # For each plugin needing update:
+   # Update one plugin at a time, then test before proceeding
    wp plugin update plugin-name
    
-   # Verify no errors
+   # Spot-check logs after each update
    tail -10 /var/log/php-errors.log
    
-   # Verify site loads
+   # Verify site returns a healthy status
    curl -so /dev/null -w "%{http_code}" https://[CUSTOMIZE: example.com]
    ```
 
@@ -848,12 +888,12 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    wp theme update parent-theme-name
    ```
 
-5. **Verify Plugins are Active**
+5. **Confirm Active Plugin State**
    ```bash
-   wp plugin status
+   wp plugin list --status=active --fields=name,status,version --format=table
    
-   # If a plugin deactivated due to error, troubleshoot:
-   wp plugin activate plugin-name --debug
+   # Reactivate only if a plugin deactivated unexpectedly
+   wp plugin activate plugin-name
    ```
 
 6. **Post-Update Checks**
@@ -867,6 +907,35 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    # Test critical pages
    curl -s https://[CUSTOMIZE: example.com] | grep "<title>"
    ```
+
+**Expected Output:**
+
+- Updated components show `update: none`.
+- Site remains reachable (`200/301/302`) during update window.
+- No new fatal errors in `/var/log/php-errors.log` or `wp-content/debug.log`.
+
+**Rollback:**
+
+```bash
+# Restore database if needed
+wp db import backup/pre-plugin-update-YYYYMMDD-HHMMSS.sql
+
+# Revert deployment to previous release when update introduces regressions
+git checkout previous-release-tag
+```
+
+Use [Section 8.3](#83-rollback-procedure) for full rollback steps.
+
+**Verification:**
+
+- Validate login, checkout/forms, search, and caching behavior.
+- Confirm plugin/theme health in dashboard (no fatal notices or forced deactivations).
+
+**Escalate If:**
+
+- Multiple plugins fail update or auto-deactivate.
+- Critical user workflows fail after rollback attempt.
+- Repeated fatal errors persist after isolating updated components.
 
 > **NOTE:** Keep a log of updates in your change management system. Document any issues encountered.
 
@@ -1013,50 +1082,76 @@ wp transient delete --expired
 
 ### 6.6 WordPress Cron (WP-Cron) Management
 
-**What is WP-Cron:**
+**Purpose:**
+Ensure scheduled WordPress tasks run predictably by using system cron with WP-CLI, while reducing external exposure of `wp-cron.php`.
 
-WP-Cron uses WordPress hooks to trigger background tasks (email notifications, scheduled posts, cache cleaning, etc.) when site traffic happens. It's not a true system cron.
+WP-Cron uses WordPress hooks to trigger background tasks when site traffic occurs. It is not a true system scheduler.
 
 > **NOTE:** If your site has low traffic, WP-Cron tasks may not run on schedule. Consider using system cron instead.
 
-**Check WP-Cron Status:**
+**Prerequisites:**
+
+- Shell access to the web server host
+- WP-CLI functional in the WordPress root
+- Change window for `wp-config.php` and web server config updates
+
+**Commands:**
 
 ```bash
 # List all scheduled cron events
 wp cron event list
 
-# Check if WP-Cron is functioning
-wp cron test
-
-# Run all pending cron tasks manually
-wp cron event run --all
+# Run due events immediately (sanity check)
+wp cron event run --due-now
 ```
 
-**Disable WP-Cron (Recommended):**
-
 Add to `wp-config.php`:
+
 ```php
 define('DISABLE_WP_CRON', true);
 ```
 
-**Use System Cron Instead (WP-CLI):**
-
-Add to system crontab:
+Install a system cron entry:
 ```bash
-# Run WordPress cron every 5 minutes using WP-CLI
-*/5 * * * * cd /home/wordpress/public_html && wp cron event run --due-now > /dev/null 2>&1
+# Add once; ensure duplicates are not introduced
+(crontab -l 2>/dev/null; echo "*/5 * * * * cd /home/wordpress/public_html && wp cron event run --due-now > /dev/null 2>&1") | crontab -
 ```
 
-**Block Direct Access to wp-cron.php:**
-
-Once system cron is configured, block external access to `wp-cron.php` at the web server level. WP-CLI executes PHP directly and does not use HTTP.
-
-For Nginx:
+Once system cron is configured, block external access to `wp-cron.php` at the web server level:
 ```nginx
 location = /wp-cron.php {
     deny all;
 }
 ```
+
+**Expected Output:**
+
+- `crontab -l` shows one `wp cron event run --due-now` entry.
+- `wp cron event run --due-now` runs without fatal errors.
+- External `GET /wp-cron.php` returns `403` after web server reload.
+
+**Rollback:**
+
+```bash
+# Remove system cron entry
+crontab -l | grep -v "wp cron event run --due-now" | crontab -
+```
+
+Then remove `define('DISABLE_WP_CRON', true);` from `wp-config.php` and restore previous web server config.
+
+**Verification:**
+
+```bash
+crontab -l | grep "wp cron event run --due-now"
+wp cron event list
+curl -s -o /dev/null -w "%{http_code}\n" https://[CUSTOMIZE: example.com]/wp-cron.php
+```
+
+**Escalate If:**
+
+- Scheduled tasks stop running after migration to system cron.
+- WP-CLI cron command fails repeatedly.
+- `wp-cron.php` cannot be reliably restricted at the web server layer.
 
 > **NOTE:** Do not use `curl` to hit `wp-cron.php` over HTTP as the system cron replacement. The `wp-cron.php` endpoint should be blocked to prevent resource exhaustion attacks. Use WP-CLI directly instead. See [WordPress Security Benchmark §4.7](https://github.com/dknauss/wp-security-benchmark) for the full rationale.
 
@@ -1416,9 +1511,20 @@ sudo chown root:root /usr/local/bin/wordpress-backup.sh
 
 ### 8.1 Code Deployment
 
+**Time Estimate:** 15-30 minutes (excluding QA window)
+
+**Purpose:**
+Deploy approved release code to production with post-deploy validation and fast rollback readiness.
+
 See Section 4.2 for complete deployment workflow.
 
-**Quick Reference:**
+**Prerequisites:**
+
+- Approved release/tag exists
+- Deployment window approved
+- Database backup and rollback path confirmed
+
+**Commands:**
 
 ```bash
 # Pull code and deploy
@@ -1437,11 +1543,35 @@ wp core is-installed && echo "OK"
 curl -I https://[CUSTOMIZE: example.com]
 ```
 
+**Expected Output:**
+
+- Target release is checked out.
+- Composer dependencies install without fatal errors.
+- Site health checks return successful status.
+
+**Rollback:**
+
+Use [Section 8.3](#83-rollback-procedure) if post-deploy verification fails.
+
+**Verification:**
+
+- Homepage and `/wp-admin/` return expected HTTP status.
+- Core workflows function (login, content read/write, critical integrations).
+
+**Escalate If:**
+
+- Deployment cannot complete within change window.
+- Core update-db step fails.
+- Service remains degraded after rollback.
+
 ### 8.2 Database Migration
 
 **Time Estimate:** 30-60 minutes
 
 > **WARNING:** Always backup before any database migration. This is high-risk.
+
+**Purpose:**
+Migrate WordPress database safely between environments while preserving integrity and minimizing outage risk.
 
 **Prerequisites:**
 - Database backup created and verified
@@ -1449,7 +1579,7 @@ curl -I https://[CUSTOMIZE: example.com]
 - Rollback plan documented
 - All users notified
 
-**Steps:**
+**Commands:**
 
 1. **Export Database from Source**
    ```bash
@@ -1472,12 +1602,8 @@ curl -I https://[CUSTOMIZE: example.com]
    # On new server - create empty database
    wp db create
    
-   # Or manually
-   mysql -u root -p
-   > CREATE DATABASE [CUSTOMIZE: new_database_name];
-   > CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
-   > GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: new_database_name].* TO '[CUSTOMIZE: wp_user]'@'localhost';
-   > FLUSH PRIVILEGES;
+   # Or create DB/user manually as root (single command)
+   mysql -u root -p -e "CREATE DATABASE [CUSTOMIZE: new_database_name]; CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[CUSTOMIZE: strong_password]'; GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: new_database_name].* TO '[CUSTOMIZE: wp_user]'@'localhost'; FLUSH PRIVILEGES;"
    ```
 
 4. **Import Database**
@@ -1519,11 +1645,32 @@ curl -I https://[CUSTOMIZE: example.com]
    # wp redis flush-db
    ```
 
-8. **Monitor for Issues**
-   - Watch error logs
-   - Test critical pages
-   - Verify user login works
-   - Check media URLs point to new location
+**Expected Output:**
+
+- Import completes without SQL errors.
+- URL replacement is accurate for changed domains.
+- `wp db check` passes and site is reachable.
+
+**Rollback:**
+
+```bash
+# Restore source backup onto target if migration validation fails
+wp db import backup/migration-source-YYYYMMDD.sql
+```
+
+Use [Section 8.3](#83-rollback-procedure) if deployment-level rollback is required.
+
+**Verification:**
+
+- Watch error logs for 15-30 minutes.
+- Test critical pages and user login.
+- Confirm media URLs and canonical links resolve correctly.
+
+**Escalate If:**
+
+- Import fails with unrecoverable SQL errors.
+- Data mismatch is detected after migration.
+- Post-migration errors persist after cache flush and URL correction.
 
 ### 8.3 Rollback Procedure
 
@@ -1533,7 +1680,16 @@ curl -I https://[CUSTOMIZE: example.com]
 
 **Scenario:** Deployment introduced critical errors and site is down or broken.
 
-**Steps:**
+**Purpose:**
+Restore service quickly after a failed deployment and preserve evidence for root-cause analysis.
+
+**Prerequisites:**
+
+- Known-good release/tag or backup artifact
+- Pre-deployment database backup available
+- Incident owner assigned
+
+**Commands:**
 
 1. **Identify Current State**
    ```bash
@@ -1581,12 +1737,35 @@ curl -I https://[CUSTOMIZE: example.com]
    git diff [old-version]...[new-version] | head -100
    ```
 
-6. **Document Incident**
-   - What went wrong
-   - When discovered
-   - Rollback time
-   - Root cause
-   - Prevention measures
+**Expected Output:**
+
+- Site returns healthy HTTP status.
+- Core functionality restored to pre-deployment behavior.
+- Error rates return to baseline.
+
+**Rollback:**
+
+If first rollback attempt fails, proceed to full restore in [Section 11.2](#112-full-site-restore-from-backup).
+
+**Verification:**
+
+- Confirm homepage and `/wp-admin/` load.
+- Validate critical business workflows.
+- Confirm log noise/fatal errors drop to normal levels.
+
+**Escalate If:**
+
+- Rollback fails or extends beyond outage threshold.
+- Data integrity cannot be confirmed.
+- Repeated rollback attempts do not stabilize service.
+
+**Documentation Checklist:**
+
+- What went wrong
+- When discovered
+- Rollback time
+- Root cause
+- Prevention measures
 
 ---
 
@@ -1818,12 +1997,21 @@ wp search-replace "old" "new" wp_posts
 
 **Time Estimate:** 5-10 minutes to identify root cause
 
+**Purpose:**
+Rapidly determine whether the outage is application, database, service, or infrastructure related and restore service.
+
 **Symptoms:**
 - Browser shows 500 error or blank page
 - Site returns HTTP 500 or 502/503
 - `curl` returns error
 
-**Immediate Actions:**
+**Prerequisites:**
+
+- SSH access to host
+- Privileged shell access for service restarts
+- Incident ticket/channel opened
+
+**Commands:**
 
 1. **Verify Site is Actually Down**
    ```bash
@@ -1868,10 +2056,10 @@ wp search-replace "old" "new" wp_posts
 
 4. **Disable Recently Activated Plugins**
    ```bash
-   # List recently activated plugins
-   wp plugin list --status=active | grep -E "activation|installed"
+   # List active plugins
+   wp plugin list --status=active --fields=name,status,version --format=table
    
-   # Deactivate all plugins (one by one, testing after each)
+   # Deactivate all plugins, then test
    wp plugin deactivate --all
    
    # Test site
@@ -1895,9 +2083,11 @@ wp search-replace "old" "new" wp_posts
 6. **Check Memory Limits**
    ```bash
    # Current PHP memory limit
-   php -r "echo ini_get('memory_limit');"
-   
-   # If low, increase (in wp-config.php)
+   php -r "echo ini_get('memory_limit').PHP_EOL;"
+   ```
+
+   If memory is insufficient, set in `wp-config.php` and retest:
+   ```php
    define('WP_MEMORY_LIMIT', '256M');
    define('WP_MAX_MEMORY_LIMIT', '512M');
    ```
@@ -1915,10 +2105,31 @@ wp search-replace "old" "new" wp_posts
    curl -I https://[CUSTOMIZE: example.com]
    ```
 
-**If Still Down:**
-- Check cloud provider status page for outages
-- Restore from recent backup (Section 11.2)
-- Escalate to senior engineer
+**Expected Output:**
+
+- Root cause identified within first 10 minutes.
+- Site recovers to healthy HTTP status after targeted mitigation.
+- Logs indicate reduced/no active fatal error stream.
+
+**Rollback:**
+
+- If plugin isolation resolves outage, reactivate plugins one-by-one and leave the culprit disabled.
+- If service remains down, execute [Section 8.3](#83-rollback-procedure) and/or [Section 11.2](#112-full-site-restore-from-backup).
+
+**Verification:**
+
+```bash
+curl -s -w "%{http_code}\n" -o /dev/null https://[CUSTOMIZE: example.com]
+curl -s -w "%{http_code}\n" -o /dev/null https://[CUSTOMIZE: example.com]/wp-admin/
+tail -20 /var/log/nginx/error.log
+tail -20 /var/log/php-errors.log
+```
+
+**Escalate If:**
+
+- Site remains unavailable after service restart and plugin isolation.
+- Database errors persist after repair attempts.
+- Infrastructure-level signals indicate host/network/provider failure.
 
 ### 10.3 Security Breach Response
 
@@ -3049,4 +3260,3 @@ To suggest improvements to this runbook, please contact [CUSTOMIZE: owner email]
 ---
 
 *This WordPress Operations Runbook is a comprehensive guide for managing WordPress installations in production environments. Regular review and updates are essential. All procedures should be tested in staging before implementation in production.*
-
