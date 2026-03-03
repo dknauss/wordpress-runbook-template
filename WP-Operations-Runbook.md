@@ -1997,126 +1997,77 @@ wp search-replace "old" "new" wp_posts
 
 **Time Estimate:** 5-10 minutes to identify root cause
 
-**Purpose:**
-Rapidly determine whether the outage is application, database, service, or infrastructure related and restore service.
+**Alert Meaning:**
+`500/502/503` on the public site or admin endpoint indicates the WordPress stack is degraded or unavailable (application, PHP-FPM, database, or host-level failure).
 
-**Symptoms:**
-- Browser shows 500 error or blank page
-- Site returns HTTP 500 or 502/503
-- `curl` returns error
+**Customer Impact:**
+Users may be unable to read content, authenticate, publish, or complete transactions. Treat as P1/P2 depending on scope and duration.
 
-**Prerequisites:**
+**Diagnosis:**
 
-- SSH access to host
-- Privileged shell access for service restarts
-- Incident ticket/channel opened
-
-**Commands:**
-
-1. **Verify Site is Actually Down**
+1. **Confirm outage and scope**
    ```bash
-   # Test from multiple locations
    curl -I https://[CUSTOMIZE: example.com]
    curl -I https://[CUSTOMIZE: example.com]/wp-admin/
-   
-   # Check HTTP status code
    curl -s -w "%{http_code}\n" -o /dev/null https://[CUSTOMIZE: example.com]
    ```
-
-2. **Check Server Status**
+2. **Check service health and host resources**
    ```bash
-   # Check if services are running
    systemctl status nginx
    systemctl status [CUSTOMIZE: php_fpm_service]
    systemctl status mysql
-   
-   # Check server load
    top -bn1 | head -20
    free -h
-   df -h /home/wordpress
-   
-   # Check for disk space
    df -h | grep -E "^/dev|^Filesystem"
    ```
-
-3. **Check Error Logs**
+3. **Inspect recent errors**
    ```bash
-   # PHP errors
-   tail -30 /var/log/php-errors.log | grep -A5 -B5 error
-   
-   # Nginx errors
+   tail -30 /var/log/php-errors.log
    tail -30 /var/log/nginx/error.log
-   
-   # MySQL errors
    tail -30 /var/log/mysql/error.log
-   
-   # WordPress debug log
    tail -30 wp-content/debug.log
    ```
-
-4. **Disable Recently Activated Plugins**
+4. **Test plugin isolation**
    ```bash
-   # List active plugins
    wp plugin list --status=active --fields=name,status,version --format=table
-   
-   # Deactivate all plugins, then test
    wp plugin deactivate --all
-   
-   # Test site
    curl -I https://[CUSTOMIZE: example.com]
-   
-   # If fixed, reactivate plugins one by one to find culprit
-   wp plugin activate plugin-name-1
-   curl -I https://[CUSTOMIZE: example.com]
-   # Continue...
    ```
-
-5. **Check Database Connection**
+5. **Validate database state**
    ```bash
    wp db check
-   
-   # If error:
    wp db repair
    wp db optimize
    ```
-
-6. **Check Memory Limits**
+6. **Check PHP memory constraints**
    ```bash
-   # Current PHP memory limit
    php -r "echo ini_get('memory_limit').PHP_EOL;"
    ```
 
-   If memory is insufficient, set in `wp-config.php` and retest:
-   ```php
-   define('WP_MEMORY_LIMIT', '256M');
-   define('WP_MAX_MEMORY_LIMIT', '512M');
-   ```
+**Immediate Mitigation:**
 
-7. **Restart Services if Needed**
+1. If plugin isolation restores service, reactivate plugins one-by-one and keep the failing plugin disabled.
+2. Restart core services in dependency order:
    ```bash
-   # Restart in this order
    sudo systemctl restart mysql
    sleep 5
    sudo systemctl restart [CUSTOMIZE: php_fpm_service]
    sleep 5
    sudo systemctl restart nginx
-   
-   # Test
-   curl -I https://[CUSTOMIZE: example.com]
+   ```
+3. If memory pressure is confirmed, update `wp-config.php` and redeploy:
+   ```php
+   define('WP_MEMORY_LIMIT', '256M');
+   define('WP_MAX_MEMORY_LIMIT', '512M');
    ```
 
-**Expected Output:**
+**Escalation:**
 
-- Root cause identified within first 10 minutes.
-- Site recovers to healthy HTTP status after targeted mitigation.
-- Logs indicate reduced/no active fatal error stream.
+- Escalate to [Section 10.4](#104-escalation-path) immediately if service remains down after mitigation attempts.
+- Trigger backup restore path via [Section 11.2](#112-full-site-restore-from-backup) if recovery time exceeds outage threshold.
+- If cloud/network signals indicate platform fault, escalate to hosting provider incident channel.
 
-**Rollback:**
-
-- If plugin isolation resolves outage, reactivate plugins one-by-one and leave the culprit disabled.
-- If service remains down, execute [Section 8.3](#83-rollback-procedure) and/or [Section 11.2](#112-full-site-restore-from-backup).
-
-**Verification:**
+**Recovery Validation:**
 
 ```bash
 curl -s -w "%{http_code}\n" -o /dev/null https://[CUSTOMIZE: example.com]
@@ -2125,11 +2076,7 @@ tail -20 /var/log/nginx/error.log
 tail -20 /var/log/php-errors.log
 ```
 
-**Escalate If:**
-
-- Site remains unavailable after service restart and plugin isolation.
-- Database errors persist after repair attempts.
-- Infrastructure-level signals indicate host/network/provider failure.
+Confirm admin login and at least one critical business workflow before closing incident.
 
 ### 10.3 Security Breach Response
 
@@ -2137,17 +2084,15 @@ tail -20 /var/log/php-errors.log
 
 > **CRITICAL:** If breach is suspected, act immediately. Data loss and reputation damage increase with every minute of delay.
 
-**Symptoms:**
-- Unexpected files appear in directory
-- Hacker message on site
-- Users report password changes they didn't make
-- Unexpected admin accounts
-- Site redirects to malicious site
-- Malware detected by security scanner
+**Alert Meaning:**
+Evidence suggests active compromise or unauthorized access (malicious files, account misuse, redirect behavior, or scanner-confirmed malware).
 
-**Immediate Actions (First 15 Minutes):**
+**Customer Impact:**
+Confidentiality, integrity, and availability are all at risk. This can require service isolation, user-facing communications, and credential revocation.
 
-1. **Notify Security Team Immediately**
+**Diagnosis:**
+
+1. **Declare incident and notify security owner**
    ```
    Severity: CRITICAL
    Issue: [Description of attack]
@@ -2155,47 +2100,39 @@ tail -20 /var/log/php-errors.log
    Affected User Data: [If known]
    Escalation: [Your contact details]
    ```
-
-2. **Isolate the Site**
+2. **Contain exposure**
    ```bash
    # Take site offline to prevent further data exfiltration
    # Option 1: Redirect to maintenance page (requires WP-CLI 2.2+)
    wp maintenance-mode activate
-   
-   # Option 2: Block all traffic except admins
-   # Add to .htaccess or nginx config:
-   # deny all;
-   # allow [CUSTOMIZE: your-ip];
    ```
-
-3. **Identify Breach Scope**
+3. **Determine scope of compromise**
    ```bash
-   # Check for suspicious accounts
    wp user list --format=table
    wp user list --role=administrator --format=table
-   
-   # Look for unexpected users (compare to known list)
-   # Delete if suspicious:
-   wp user delete [USER_ID] --reassign=[ADMIN_ID]
-   ```
-
-4. **Check for Web Shells**
-   ```bash
-   # Find recently modified PHP files
    find /home/wordpress -name "*.php" -type f -mtime -7 -ls
-   
-   # Look for suspicious files
    find /home/wordpress -name "shell.php" -o -name "admin.php" -o -name "tmp*.php"
-   
-   # Remove if found (back up first for forensics)
-   cp /home/wordpress/public_html/suspicious-file.php \
-     /root/forensics/suspicious-file.php.bak
-   rm /home/wordpress/public_html/suspicious-file.php
+   ```
+4. **Capture forensic artifacts before cleanup**
+   ```bash
+   tar -czf /root/forensics/breach-evidence-$(date +%Y%m%d-%H%M%S).tar.gz /home/wordpress/public_html
+   wp db export /root/forensics/breach-evidence-db-$(date +%Y%m%d-%H%M%S).sql
+   ```
+5. **Perform security scans**
+   ```bash
+   clamscan -r /home/wordpress/public_html/
+   aide --check > /tmp/aide-report.txt
    ```
 
-5. **Force Password Resets**
+**Immediate Mitigation:**
+
+1. Disable compromised plugins/themes and remove confirmed malicious files after evidence capture.
    ```bash
-   # Reset all admin passwords
+   wp plugin deactivate infected-plugin-name
+   wp plugin delete infected-plugin-name
+   ```
+2. Reset privileged credentials and terminate active sessions.
+   ```bash
    wp user list --role=administrator --field=user_login | while read user; do
      NEW_PASS=$(openssl rand -base64 16)
      wp user update "$user" --user_pass="$NEW_PASS"
@@ -2207,59 +2144,34 @@ tail -20 /var/log/php-errors.log
    # Alternative: wp db query "DELETE FROM wp_usermeta WHERE meta_key LIKE '_session_tokens';"
    wp user list --field=ID | xargs -I {} wp user session destroy {} --all
    ```
-
-6. **Scan for Malware**
+3. Patch vulnerable components.
    ```bash
-   # Wordfence scans must be initiated through wp-admin > Wordfence > Scan
-   # For CLI-based malware scanning, use dedicated tools:
-   clamscan -r /home/wordpress/public_html/
-
-   # Or use AIDE for file integrity
-   aide --check > /tmp/aide-report.txt
-   ```
-
-7. **Backup Everything for Forensics**
-   ```bash
-   # Before cleaning, backup entire site for investigation
-   tar -czf /root/forensics/breach-evidence-$(date +%Y%m%d-%H%M%S).tar.gz \
-     /home/wordpress/public_html
-   
-   # Export database
-   wp db export /root/forensics/breach-evidence-db-$(date +%Y%m%d-%H%M%S).sql
-   ```
-
-8. **Clean the Site**
-   ```bash
-   # Remove malware files
-   wp plugin deactivate infected-plugin-name
-   wp plugin delete infected-plugin-name
-   
-   # Update all plugins, themes, WordPress core
    wp core update
    wp plugin update --all
    wp theme update --all
-   
-   # Change all passwords and API keys
-   # (Regenerate WordPress security keys in wp-config.php)
    ```
 
-9. **Monitor Closely**
-   ```bash
-   # Watch for re-compromise
-   tail -f /var/log/nginx/access.log | grep -i "shell\|admin\|eval"
-   watch -n 5 'ps aux | grep php'
-   
-   # Check for suspicious cron jobs
-   crontab -l
-   wp cron event list
-   ```
+**Escalation:**
 
-**Post-Incident:**
-- Contact affected users
-- Monitor security vendor alerts
-- File incident report
-- Update security measures
-- Schedule security audit
+- Escalate immediately via [Section 10.4](#104-escalation-path) to Security Officer and Incident Commander.
+- If regulated data may be exposed, involve legal/compliance workflow before public disclosure.
+- If compromise cannot be contained quickly, execute disaster recovery path in [Section 11.2](#112-full-site-restore-from-backup).
+
+**Recovery Validation:**
+
+```bash
+wp user list --role=administrator --format=table
+wp cron event list
+tail -40 /var/log/nginx/access.log
+tail -40 /var/log/php-errors.log
+```
+
+Then confirm:
+
+- no unauthorized admin accounts remain;
+- malware scans return clean results;
+- site behavior is normal for at least one monitoring window;
+- incident report is completed in [Section 10.6](#106-post-incident-review).
 
 ### 10.4 Escalation Path
 
@@ -2294,89 +2206,67 @@ tail -20 /var/log/php-errors.log
 
 **Time Estimate:** 15-30 minutes to identify cause
 
-**Symptoms:**
-- Page load > 2 seconds
-- High CPU usage (>80%)
-- High memory usage (>90%)
-- Database slow queries
-- Users report site sluggish
+**Alert Meaning:**
+Latency, resource saturation, or query contention indicates degraded but not fully unavailable service.
 
-**Diagnostic Steps:**
+**Customer Impact:**
+Users experience slow page loads, failed submissions, and reduced admin productivity; prolonged degradation can cascade into full outage.
 
-1. **Check Current Performance**
+**Diagnosis:**
+
+1. **Measure current system and application performance**
    ```bash
-   # Load average
    uptime
-   
-   # CPU usage
    top -bn1 | head -15
-   
-   # Memory
    free -h
-   
-   # Response time
    time curl -s https://[CUSTOMIZE: example.com] > /dev/null
    ```
-
-2. **Identify Bottleneck**
+2. **Identify primary bottleneck**
    ```bash
-   # MySQL slow query log
    tail -50 /var/log/mysql/slow.log
-   
-   # PHP profiling
-   wp plugin install query-monitor --activate
-   # View profiling at https://example.com/?qm-uuid=...
-   
-   # Nginx access log analysis
    tail -1000 /var/log/nginx/access.log | awk '{print $NF}' | sort | uniq -c | sort -rn | head
    ```
-
-3. **Check Common Causes**
+3. **Check common WordPress-specific causes**
    ```bash
-   # Full disk
    df -h /home/wordpress
-   
-   # Database size
    wp db query "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)' FROM information_schema.tables WHERE table_schema = '[CUSTOMIZE: wordpress_db]';"
-   
-   # Large posts/revisions
    wp post list --orderby=post_date --order=DESC --posts_per_page=100 --format=table
-   
-   # Runaway cron jobs
    wp cron event list
    ps aux | grep "wp cron"
    ```
 
-4. **Optimize Database**
-   ```bash
-   # Delete old revisions
-   wp db query "DELETE FROM wp_posts WHERE post_type = 'revision';"
-   
-   # Optimize tables
-   wp db optimize
-   
-   # Delete expired transients
-   wp transient delete --expired
-   ```
+**Immediate Mitigation:**
 
-5. **Clear Caches**
+1. Reduce immediate load and clear caches.
    ```bash
    wp cache flush
    # Plugin-dependent — uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
-
-   # Clear browser cache headers
-   curl -I https://[CUSTOMIZE: example.com] | grep Cache-Control
    ```
-
-6. **Monitor Results**
+2. Run safe database hygiene steps.
    ```bash
-   # Wait 5 minutes and test again
-   time curl -s https://[CUSTOMIZE: example.com] > /dev/null
-   uptime
-   free -h
+   wp db optimize
+   wp transient delete --expired
    ```
+3. If a plugin is identified as the bottleneck, disable it and validate service response.
+
+**Escalation:**
+
+- Escalate via [Section 10.4](#104-escalation-path) if response times remain above SLO after mitigation window.
+- Escalate to DBA when slow query volume persists despite cache/optimization actions.
+- Escalate to infrastructure owner when host CPU/memory/disk saturation cannot be relieved at application layer.
+
+**Recovery Validation:**
+
+```bash
+time curl -s https://[CUSTOMIZE: example.com] > /dev/null
+uptime
+free -h
+curl -I https://[CUSTOMIZE: example.com] | grep -i Cache-Control
+```
+
+Confirm response time and host utilization return to baseline for at least 15 minutes.
 
 ### 10.6 Post-Incident Review
 
