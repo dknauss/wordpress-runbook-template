@@ -185,7 +185,7 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 | **Page Cache** | [CUSTOMIZE: W3 Total Cache / WP Super Cache / Litespeed] | Full page HTML | 1 hour |
 | **Object Cache** | [CUSTOMIZE: Redis / Memcached / Object Cache Pro] | Database queries, transients | 24 hours |
 | **Browser Cache** | HTTP headers (Cache-Control) | Client-side assets | 1 week (CSS/JS), 1 month (images) |
-| **Database Query Cache** | MySQL Query Cache | SELECT statements | Disabled / configured |
+| **Database Query Cache** | MariaDB Query Cache (removed in MySQL 8.0+) | SELECT statements | Disabled / configured |
 | **CDN Cache** | [CUSTOMIZE: Cloudflare / Bunny / AWS CloudFront] | Static assets, images | Varies |
 
 ### 3.4 File System Locations
@@ -775,7 +775,8 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 5. **Clear Caches**
    ```bash
    wp cache flush
-   wp w3-total-cache flush all
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
    ```
 
 6. **Test Site**
@@ -1493,8 +1494,9 @@ curl -I https://[CUSTOMIZE: example.com]
 7. **Clear Caches**
    ```bash
    wp cache flush
-   wp w3-total-cache flush all
-   wp redis flush-db
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
+   # wp redis flush-db
    ```
 
 8. **Monitor for Issues**
@@ -2124,9 +2126,10 @@ wp search-replace "old" "new" wp_posts
 5. **Clear Caches**
    ```bash
    wp cache flush
-   wp w3-total-cache flush all
-   wp redis flush-db
-   
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
+   # wp redis flush-db
+
    # Clear browser cache headers
    curl -I https://[CUSTOMIZE: example.com] | grep Cache-Control
    ```
@@ -2317,9 +2320,10 @@ Date: [Date]
    ```bash
    # Clear caches
    wp cache flush
-   wp w3-total-cache flush all
-   wp redis flush-db
-   
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
+   # wp redis flush-db
+
    # Restart services
    sudo systemctl restart nginx
    sudo systemctl restart [CUSTOMIZE: php_fpm_service]
@@ -2402,8 +2406,9 @@ Date: [Date]
    
    # Clear all caches
    wp cache flush
-   wp w3-total-cache flush all
-   wp redis flush-db
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
+   # wp redis flush-db
    ```
 
 7. **Monitor Site**
@@ -2917,7 +2922,7 @@ Check if site is down:       curl -I https://example.com
 View recent errors:          tail -30 /var/log/php-errors.log
 Check server status:         top -bn1 | head
 Disable all plugins:         wp plugin deactivate --all
-Clear all caches:            wp cache flush && wp redis flush-db
+Clear all caches:            wp cache flush
 Restore from backup:         wp db import backup/db_TIMESTAMP.sql
 
 IMPORTANT PATHS:
