@@ -42,7 +42,7 @@ Use this table to quickly find solutions to common issues.
 | Missing database tables | Section 8.3 | `wp db check` |
 | Plugin causing crashes | Section 10.2 | `wp plugin deactivate --all` |
 | Need to restore from backup | Section 11.2 | Check backup integrity first |
-| WordPress cannot write to disk | Appendix A | `wp server list --format=csv` |
+| WordPress cannot write to disk | Appendix A | `ls -ld /home/wordpress/public_html/wp-content/uploads` |
 | SSL certificate expired | Section 3.5 | `openssl x509 -in [cert] -noout -text` |
 | Users locked out | Section 5.5 | `wp user list --role=administrator --format=table` |
 | Hacked/malware suspected | Section 10.3 | Isolate site immediately, see escalation |
@@ -625,14 +625,14 @@ awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn
 
 **Choose and Standardize One 2FA Plugin:**
 
-- [CUSTOMIZE: 2fa_plugin_slug] (for example, `wp-2fa` or `two-factor`)
+- `wp-2fa` (Melapress).
 
 **Implementation Steps:**
 
 1. Install and activate the approved 2FA plugin:
 
 ```bash
-wp plugin install [CUSTOMIZE: 2fa_plugin_slug] --activate
+wp plugin install wp-2fa --activate
 ```
 
 2. In plugin settings, enforce 2FA for `administrator` (and any additional privileged roles).
@@ -642,7 +642,7 @@ wp plugin install [CUSTOMIZE: 2fa_plugin_slug] --activate
 4. Verify operational state:
 
 ```bash
-wp plugin is-active [CUSTOMIZE: 2fa_plugin_slug] && echo "2FA plugin active"
+wp plugin is-active wp-2fa && echo "2FA plugin active"
 wp user list --role=administrator --fields=ID,user_login,user_email --format=table
 ```
 
@@ -652,10 +652,10 @@ wp user list --role=administrator --fields=ID,user_login,user_email --format=tab
 
 ```bash
 # Use only during approved incident response
-wp plugin deactivate [CUSTOMIZE: 2fa_plugin_slug]
+wp plugin deactivate wp-2fa
 
 # Re-enable immediately after account recovery
-wp plugin activate [CUSTOMIZE: 2fa_plugin_slug]
+wp plugin activate wp-2fa
 ```
 
 > **WARNING:** Any bypass window must be ticketed, time-bounded, and reviewed after closure.
@@ -926,7 +926,8 @@ wp transient delete --expired --all
    ```bash
    php -v
    wp core version
-   wp plugin list --field=name | while read plugin; do echo "=== $plugin ==="; wp plugin install $plugin --activate 2>&1 | grep -i "php\|version" || true; done
+   wp plugin list --fields=name,status,version,update --format=table
+   # Verify PHP compatibility for critical plugins in vendor docs before upgrade.
    ```
 
 2. **Update PHP on Staging**
