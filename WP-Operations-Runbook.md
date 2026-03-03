@@ -625,14 +625,14 @@ awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn
 
 **Choose and Standardize One 2FA Plugin:**
 
-- `wp-2fa` (Melapress).
+- `two-factor`.
 
 **Implementation Steps:**
 
 1. Install and activate the approved 2FA plugin:
 
 ```bash
-wp plugin install wp-2fa --activate
+wp plugin install two-factor --activate
 ```
 
 2. In plugin settings, enforce 2FA for `administrator` (and any additional privileged roles).
@@ -642,7 +642,7 @@ wp plugin install wp-2fa --activate
 4. Verify operational state:
 
 ```bash
-wp plugin is-active wp-2fa && echo "2FA plugin active"
+wp plugin is-active two-factor && echo "2FA plugin active"
 wp user list --role=administrator --fields=ID,user_login,user_email --format=table
 ```
 
@@ -652,10 +652,10 @@ wp user list --role=administrator --fields=ID,user_login,user_email --format=tab
 
 ```bash
 # Use only during approved incident response
-wp plugin deactivate wp-2fa
+wp plugin deactivate two-factor
 
 # Re-enable immediately after account recovery
-wp plugin activate wp-2fa
+wp plugin activate two-factor
 ```
 
 > **WARNING:** Any bypass window must be ticketed, time-bounded, and reviewed after closure.
