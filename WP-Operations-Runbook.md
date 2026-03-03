@@ -37,7 +37,7 @@ Use this table to quickly find solutions to common issues.
 
 | Symptom | Go To | First Command |
 |---------|-------|---------------|
-| Site returns 500 error | Section 10.2 | `wp plugin status` |
+| Site returns 500 error | Section 10.2 | `tail /var/log/php-errors.log` (if PHP/WP-CLI fails: check error log first) |
 | Site is slow/not responding | Section 10.5 | `top` and `free -h` |
 | Missing database tables | Section 11.3 | `wp db check` |
 | Plugin causing crashes | Section 10.2 | `wp plugin deactivate --all` |
@@ -103,7 +103,7 @@ This document is intended for:
 | **Domain** | [CUSTOMIZE: example.com] |
 | **Site Name** | [CUSTOMIZE: My WordPress Site] |
 | **WordPress Version** | [CUSTOMIZE: 6.4+] |
-| **PHP Version** | [CUSTOMIZE: 8.1+] |
+| **PHP Version** | [CUSTOMIZE: 8.2+] |
 | **Server OS** | [CUSTOMIZE: Ubuntu 22.04 LTS] |
 | **Hosting Type** | [CUSTOMIZE: Self-hosted/Managed/VPS] |
 | **Server Hostname** | [CUSTOMIZE: wp-prod-01.example.com] |
@@ -257,6 +257,9 @@ The following header is configured in Nginx to enforce HTTPS:
 
 ```nginx
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+# Note: The preload directive submits the domain to browser HSTS preload lists,
+# which is difficult to reverse. Add preload only after confirming all subdomains
+# support HTTPS and obtaining organizational approval.
 ```
 
 This tells browsers to only connect via HTTPS for one year.
@@ -436,7 +439,7 @@ wordpress-repo/
    wp cache flush
    # Plugin-dependent — uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
-   # wp redis flush
+   # wp redis flush-db
    ```
 
 ---
@@ -557,9 +560,13 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
 
 # Content Security Policy (CSP) - restrict content sources
+# WARNING: unsafe-eval weakens CSP significantly. Remove where possible.
+# See Benchmark 1.2 for hardened CSP guidance.
 add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.example.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;" always;
 
 # HSTS - Force HTTPS
+# Note: Add preload only after confirming all subdomains support HTTPS
+# and obtaining organizational approval.
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 ```
 
@@ -584,12 +591,12 @@ Option 1 (preferred): Block at the web server level in Nginx `/etc/nginx/conf.d/
 ```nginx
 location = /xmlrpc.php {
     deny all;
-    return 403;
 }
 ```
 
 Option 2: Disable via a must-use plugin (`wp-content/mu-plugins/disable-xmlrpc.php`):
 ```php
+<?php
 add_filter( 'xmlrpc_enabled', '__return_false' );
 ```
 
@@ -599,11 +606,25 @@ Additionally, disable trackbacks and pingbacks in **Settings → Discussion** by
 
 Keep required public endpoints available (for example, posts on public sites) and restrict only sensitive routes.
 
-Example must-use plugin (`wp-content/mu-plugins/restrict-rest-users.php`) to reduce user-enumeration exposure:
+Example must-use plugin (`wp-content/mu-plugins/restrict-rest-users.php`) to restrict user-enumeration to authorized users (see Benchmark 5.6):
 ```php
+<?php
+// Restrict /wp/v2/users to users with the list_users capability.
 add_filter( 'rest_endpoints', function( $endpoints ) {
-    unset( $endpoints['/wp/v2/users'] );
-    unset( $endpoints['/wp/v2/users/(?P<id>[\d]+)'] );
+    if ( isset( $endpoints['/wp/v2/users'] ) ) {
+        foreach ( $endpoints['/wp/v2/users'] as $i => $route ) {
+            $endpoints['/wp/v2/users'][ $i ]['permission_callback'] = function() {
+                return current_user_can( 'list_users' );
+            };
+        }
+    }
+    if ( isset( $endpoints['/wp/v2/users/(?P<id>[\\d]+)'] ) ) {
+        foreach ( $endpoints['/wp/v2/users/(?P<id>[\\d]+)'] as $i => $route ) {
+            $endpoints['/wp/v2/users/(?P<id>[\\d]+)'][ $i ]['permission_callback'] = function() {
+                return current_user_can( 'list_users' );
+            };
+        }
+    }
     return $endpoints;
 } );
 ```
@@ -752,9 +773,9 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 
 3. **Update WordPress Core**
    ```bash
-   # Check for updates
-   wp core update --dry-run
-   
+   # Check for available updates
+   wp core check-update
+
    # Update WordPress
    wp core update
    
@@ -875,14 +896,11 @@ wp db query "SHOW TABLE STATUS;"
 **Remove Old Revisions:**
 
 ```bash
-# Check revision count
-wp db query "SELECT COUNT(*) AS old_slug_count FROM $(wp db prefix)postmeta WHERE meta_key = '_wp_old_slug';"
+# Count revisions
+wp db query "SELECT COUNT(*) AS revision_count FROM $(wp db prefix)posts WHERE post_type = 'revision';"
 
-# Delete all revisions (keeps latest 5)
-wp shell
-< delete all post revisions keeping only last 5
-> $results = $wpdb->get_results("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_edit_lock'");
-> # Then manually delete old revisions...
+# Delete all revisions
+wp post list --post_type=revision --format=ids | xargs wp post delete --force
 ```
 
 Or add to `wp-config.php` to limit future revisions:
@@ -1037,7 +1055,6 @@ For Nginx:
 ```nginx
 location = /wp-cron.php {
     deny all;
-    return 403;
 }
 ```
 
@@ -1056,6 +1073,7 @@ WordPress should send emails through an SMTP service, not PHP mail():
 wp plugin install wp-mail-smtp --activate
 
 # Configure SMTP via WP-CLI
+# Plugin-dependent — requires WP Mail SMTP or equivalent mail plugin
 wp option update mailer '{"mailer":"smtp"}'
 wp option update mailer_host '[CUSTOMIZE: smtp.sendgrid.net]'
 wp option update mailer_port '587'
@@ -1068,6 +1086,8 @@ wp option update mailer_username '[CUSTOMIZE: apikey]'
 
 ```php
 // Use Sendgrid or Postmark SMTP
+// Note: These constants are NOT consumed by WordPress core. They require
+// a mail plugin (e.g., WP Mail SMTP) or custom mu-plugin code that reads them.
 define('SMTP_HOST', '[CUSTOMIZE: smtp.sendgrid.net]');
 define('SMTP_PORT', 587);
 define('SMTP_USER', '[CUSTOMIZE: apikey]');
@@ -1538,8 +1558,8 @@ curl -I https://[CUSTOMIZE: example.com]
    # Restore from pre-deployment backup
    wp db import backup/pre-deploy-TIMESTAMP.sql
    
-   # Or if using database transactions
-   wp db query "ROLLBACK;"
+   # Note: There is no transactional rollback for wp db import.
+   # To revert, restore from the pre-migration backup above.
    ```
 
 4. **Verify Rollback**
@@ -1596,8 +1616,11 @@ wp-content/uploads/
 ```bash
 # Install image optimization plugin
 wp plugin install wp-smushit --activate
+```
 
-# Or configure in nginx for automatic WebP delivery
+Or configure in Nginx for automatic WebP delivery:
+
+```nginx
 location ~* ^.+\.(jpg|jpeg|gif|png)$ {
     # Serve WebP if browser accepts it and file exists
     if ($http_accept ~* "webp") {
@@ -1925,7 +1948,7 @@ wp search-replace "old" "new" wp_posts
 2. **Isolate the Site**
    ```bash
    # Take site offline to prevent further data exfiltration
-   # Option 1: Redirect to maintenance page (requires WP-CLI 2.8+)
+   # Option 1: Redirect to maintenance page (requires WP-CLI 2.2+)
    wp maintenance-mode activate
    
    # Option 2: Block all traffic except admins
@@ -1969,6 +1992,8 @@ wp search-replace "old" "new" wp_posts
    done
 
    # Invalidate all existing sessions
+   # Plugin-dependent — wp user session destroy requires a session management plugin.
+   # Alternative: wp db query "DELETE FROM wp_usermeta WHERE meta_key LIKE '_session_tokens';"
    wp user list --field=ID | xargs -I {} wp user session destroy {} --all
    ```
 
@@ -2695,7 +2720,7 @@ define('EMPTY_TRASH_DAYS', 30);  // Auto-delete trash after 30 days
 define('JPEG_QUALITY', 82);  // Compressed JPEG quality (0-100)
 
 // Periodic backups
-define('WP_AUTO_UPDATE_CORE', 'minor');  // Auto-update minor versions only
+define('WP_AUTO_UPDATE_CORE', 'minor');  // Auto-update minor versions only (available since WordPress 5.6)
 ```
 
 ### B.6 WordPress Cron Constants
@@ -2777,7 +2802,7 @@ $table_prefix = 'wp_';  // Default; non-default prefixes are optional obscurity 
 // LANGUAGE AND LOCALE
 // ============================================================
 // WPLANG is deprecated since WordPress 4.0. Set language via Settings > General or:
-// wp language core install en_US && wp site switch-language en_US
+// wp language core install en_US && wp language core activate en_US
 
 // ============================================================
 // WORDPRESS SECURITY
@@ -2850,7 +2875,7 @@ This section documents all updates to this runbook and corresponding infrastruct
 **Breaking Changes:**
 - Set `DISALLOW_FILE_EDIT = true` as baseline; `DISALLOW_FILE_MODS` moved to optional hardened profile
 - Changed default post revision limit to 5 (from unlimited)
-- Updated PHP minimum version requirement to 8.1+
+- Updated PHP minimum version requirement to 8.2+
 
 **Infrastructure Changes:**
 - Upgraded to MySQL 8.0 / MariaDB 10.6
@@ -2896,7 +2921,7 @@ Do not add these symbols to `wp-config.php` hardening templates:
 - `DISALLOW_PLUGIN_ACTIVATION` (not a core constant)
 - `SECURE_LOGGED_IN_COOKIE` (not a core constant)
 - `define('XMLRPC_REQUEST', false)` (`XMLRPC_REQUEST` is request-context only)
-- `WPLANG` (deprecated since WordPress 4.0; set language via Settings > General or WP-CLI `wp site switch-language`)
+- `WPLANG` (deprecated since WordPress 4.0; set language via Settings > General or WP-CLI `wp language core activate`)
 
 Use `DISALLOW_FILE_EDIT` as baseline, and use `DISALLOW_FILE_MODS` only when deployment/update workflows are externalized.
 
