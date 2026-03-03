@@ -3,7 +3,7 @@ title: "WordPress Operations Runbook [TEMPLATE]"
 subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
 author: "Dan Knauss"
 date: "March 3, 2026"
-version: "2.0"
+version: "3.0"
 header-includes: |
   \usepackage{eso-pic}
   \AtBeginDocument{%
