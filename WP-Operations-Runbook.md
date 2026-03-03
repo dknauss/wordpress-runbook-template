@@ -666,6 +666,8 @@ awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn
 
 **Objective:** Require 2FA for all administrator-capable accounts and maintain a documented break-glass recovery path.
 
+See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §5.1 for the compliance audit checklist and configuration rationale.
+
 **Choose and Standardize One 2FA Plugin:**
 
 - `two-factor`.
@@ -859,6 +861,8 @@ Then verify admin login and critical user flows in browser.
 
 **Purpose:**
 Apply plugin and theme updates with controlled blast radius, rapid detection of regressions, and a clear rollback path.
+
+The [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §8.3 defines the patching SLA: security updates within 72 hours, critical patches within 24 hours or virtual-patched immediately.
 
 **Prerequisites:**
 - All updates tested on staging
@@ -1998,7 +2002,7 @@ Lifecycle metadata for incident response procedures is tracked in [Appendix E](#
 
 **Prerequisites for all incident procedures below:**
 - SSH access to the production host with `sudo` privileges
-- WP-CLI installed and accessible in `$PATH`
+- WP-CLI 2.5+ installed and accessible in `$PATH` (verify: `wp cli version`)
 - Access to monitoring dashboards and log aggregation
 - Contact list for on-call personnel (see [Section 10.4](#104-incident-roles-and-escalation-path))
 
@@ -2102,26 +2106,30 @@ Confirm admin login and at least one critical business workflow before closing i
 
 > **CRITICAL:** If breach is suspected, act immediately. Data loss and reputation damage increase with every minute of delay.
 
+This procedure implements the NIST SP 800-61r3 incident handling lifecycle described in the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §12.3.
+
 **Alert Meaning:**
 Evidence suggests active compromise or unauthorized access (malicious files, account misuse, redirect behavior, or scanner-confirmed malware).
 
 **Customer Impact:**
 Confidentiality, integrity, and availability are all at risk. This can require service isolation, user-facing communications, and credential revocation.
 
+**First action -- declare the incident:**
+
+```text
+Severity: CRITICAL
+Issue: [Description of attack]
+Time Detected: [Time]
+Affected User Data: [If known]
+Escalation: [Your contact details]
+```
+
 **Diagnosis:**
 
-1. **Declare incident and notify security owner**
-   ```
-   Severity: CRITICAL
-   Issue: [Description of attack]
-   Time Detected: [Time]
-   Affected User Data: [If known]
-   Escalation: [Your contact details]
-   ```
-2. **Contain exposure**
+1. **Contain exposure**
    ```bash
    # Take site offline to prevent further data exfiltration
-   # Option 1: Redirect to maintenance page (requires WP-CLI 2.2+)
+   # Option 1: Redirect to maintenance page (requires WP-CLI 2.5+)
    wp maintenance-mode activate
 
    # Option 2: Block all traffic except admins
@@ -2129,20 +2137,20 @@ Confidentiality, integrity, and availability are all at risk. This can require s
    # deny all;
    # allow [CUSTOMIZE: your-ip];
    ```
-3. **Determine scope of compromise**
+2. **Determine scope of compromise**
    ```bash
    wp user list --format=table
    wp user list --role=administrator --format=table
    find /home/wordpress -name "*.php" -type f -mtime -7 -ls
    find /home/wordpress -name "shell.php" -o -name "admin.php" -o -name "tmp*.php"
    ```
-4. **Capture forensic artifacts before cleanup**
+3. **Capture forensic artifacts before cleanup**
    ```bash
    tar -czf /root/forensics/breach-evidence-$(date +%Y%m%d-%H%M%S).tar.gz \
      /home/wordpress/public_html
    wp db export /root/forensics/breach-evidence-db-$(date +%Y%m%d-%H%M%S).sql
    ```
-5. **Perform security scans**
+4. **Perform security scans**
    ```bash
    # Wordfence scans must be initiated through wp-admin > Wordfence > Scan
    # For CLI-based malware scanning, use dedicated tools:
@@ -2170,9 +2178,7 @@ Confidentiality, integrity, and availability are all at risk. This can require s
      echo "Reset $user — communicate new password via secure channel"
    done
 
-   # Invalidate all existing sessions
-   # Plugin-dependent — wp user session destroy requires a session management plugin.
-   # Alternative: wp db query "DELETE FROM wp_usermeta WHERE meta_key LIKE '_session_tokens';"
+   # Invalidate all existing sessions (built-in WP-CLI command, no plugin required)
    wp user list --field=ID | xargs -I {} wp user session destroy {} --all
    ```
 4. Patch vulnerable components.
@@ -2182,7 +2188,15 @@ Confidentiality, integrity, and availability are all at risk. This can require s
    wp theme update --all
    ```
 
-**Post-Mitigation Monitoring:**
+**Escalation:**
+
+- Escalate immediately via [Section 10.4](#104-incident-roles-and-escalation-path) to Security Officer and Incident Commander.
+- If regulated data may be exposed, involve legal/compliance workflow before public disclosure.
+- If compromise cannot be contained quickly, execute disaster recovery path in [Section 11.2](#112-full-site-restore-from-backup).
+
+**Recovery Validation:**
+
+Run active monitoring for at least one full monitoring window (minimum 30 minutes):
 
 ```bash
 # Watch for re-compromise indicators in real time
@@ -2194,15 +2208,7 @@ crontab -l
 wp cron event list
 ```
 
-Run active monitoring for at least one full monitoring window (minimum 30 minutes) before reducing alerting posture.
-
-**Escalation:**
-
-- Escalate immediately via [Section 10.4](#104-incident-roles-and-escalation-path) to Security Officer and Incident Commander.
-- If regulated data may be exposed, involve legal/compliance workflow before public disclosure.
-- If compromise cannot be contained quickly, execute disaster recovery path in [Section 11.2](#112-full-site-restore-from-backup).
-
-**Recovery Validation:**
+Then confirm recovery:
 
 ```bash
 wp user list --role=administrator --format=table
@@ -2218,12 +2224,7 @@ Then confirm:
 - site behavior is normal for at least one monitoring window;
 - incident report is completed in [Section 10.6](#106-post-incident-review).
 
-**Post-Incident:**
-- Contact affected users
-- Monitor security vendor alerts
-- File incident report
-- Update security measures
-- Schedule security audit
+After all validation checks pass, initiate a full post-incident review per [Section 10.6](#106-post-incident-review), including affected-user notification and a security audit schedule.
 
 ### 10.4 Incident Roles and Escalation Path
 
