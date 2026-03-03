@@ -39,7 +39,7 @@ Use this table to quickly find solutions to common issues.
 |---------|-------|---------------|
 | Site returns 500 error | Section 10.2 | `wp plugin status` |
 | Site is slow/not responding | Section 10.5 | `top` and `free -h` |
-| Missing database tables | Section 8.3 | `wp db check` |
+| Missing database tables | Section 11.3 | `wp db check` |
 | Plugin causing crashes | Section 10.2 | `wp plugin deactivate --all` |
 | Need to restore from backup | Section 11.2 | Check backup integrity first |
 | WordPress cannot write to disk | Appendix A | `ls -ld /home/wordpress/public_html/wp-content/uploads` |
@@ -320,7 +320,7 @@ wordpress-repo/
    git checkout release/version-X.Y.Z
    
    # Install/update dependencies
-   composer update --no-dev
+   composer install --no-dev
    wp plugin update --all
    wp theme update --all
    
@@ -355,7 +355,7 @@ wordpress-repo/
    git checkout release/version-X.Y.Z
    
    # Install dependencies
-   composer update --no-dev
+   composer install --no-dev
    
    # Update plugins (one by one, monitor after each)
    wp plugin update wp-plugin-name-1
@@ -434,8 +434,9 @@ wordpress-repo/
 6. **Clear Caches**
    ```bash
    wp cache flush
-   wp w3-total-cache flush all
-   wp redis flush-db
+   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # wp w3-total-cache flush all
+   # wp redis flush
    ```
 
 ---
@@ -768,7 +769,7 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    
    # Check for errors in logs
    tail -20 /var/log/php-errors.log
-   wp debug log tail --lines=20
+   tail -20 wp-content/debug.log
    ```
 
 5. **Clear Caches**
@@ -798,8 +799,8 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 
 1. **List Available Updates**
    ```bash
-   wp plugin list --format=table --field=name,status,update
-   wp theme list --format=table --field=name,status,update
+   wp plugin list --format=table --fields=name,status,update
+   wp theme list --format=table --fields=name,status,update
    ```
 
 2. **Backup Database**
@@ -815,8 +816,8 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
    # Verify no errors
    tail -10 /var/log/php-errors.log
    
-   # Run a quick health check
-   wp health-check run
+   # Verify site loads
+   curl -so /dev/null -w "%{http_code}" https://[CUSTOMIZE: example.com]
    ```
 
 4. **Update Themes**
@@ -861,17 +862,20 @@ wp db query "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS '
 wp db optimize
 
 # Check for database errors
-wp db check --repair
+wp db check
+
+# If errors found, repair:
+wp db repair
 
 # View database statistics
-wp db query "SHOW TABLE STATUS;" --format=table
+wp db query "SHOW TABLE STATUS;"
 ```
 
 **Remove Old Revisions:**
 
 ```bash
 # Check revision count
-wp post-meta list --meta-key='_wp_old_slug' --format=count
+wp db query "SELECT COUNT(*) AS old_slug_count FROM $(wp db prefix)postmeta WHERE meta_key = '_wp_old_slug';"
 
 # Delete all revisions (keeps latest 5)
 wp shell
@@ -889,20 +893,17 @@ define('WP_POST_REVISIONS', 5);
 
 ```bash
 # List spam comments
-wp comment list --status=spam --format=table --field=comment_ID,comment_author,comment_date
+wp comment list --status=spam --format=table --fields=comment_ID,comment_author,comment_date
 
 # Delete spam comments
-wp comment delete --force --status=spam
+wp comment delete $(wp comment list --status=spam --format=ids) --force
 ```
 
 **Remove Unused Transients:**
 
 ```bash
-# Check for expired transients
-wp transient list --expired
-
-# Delete all expired transients
-wp transient delete --expired --all
+# Delete expired transients
+wp transient delete --expired
 ```
 
 ### 6.5 PHP Version Upgrade
@@ -1361,7 +1362,7 @@ sudo chown root:root /usr/local/bin/wordpress-backup.sh
    wp db import /tmp/test-restore.sql --allow-root
    
    # Verify tables
-   wp db table list --all-tables --format=table
+   wp db tables --all-tables --format=table
    ```
 
 4. **Test File Restore**
@@ -1454,7 +1455,7 @@ curl -I https://[CUSTOMIZE: example.com]
    mysql -u root -p
    > CREATE DATABASE [CUSTOMIZE: new_database_name];
    > CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
-   > GRANT ALL PRIVILEGES ON [CUSTOMIZE: new_database_name].* TO '[CUSTOMIZE: wp_user]'@'localhost';
+   > GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: new_database_name].* TO '[CUSTOMIZE: wp_user]'@'localhost';
    > FLUSH PRIVILEGES;
    ```
 
@@ -1483,7 +1484,7 @@ curl -I https://[CUSTOMIZE: example.com]
    wp db check
    
    # Verify tables count
-   wp db table list --all-tables --format=table
+   wp db tables --all-tables --format=table
    
    # Check for errors
    wp db query "SHOW ENGINE INNODB STATUS\G" | head -50
@@ -1543,7 +1544,7 @@ curl -I https://[CUSTOMIZE: example.com]
    ```bash
    wp core version
    curl -I https://[CUSTOMIZE: example.com]
-   wp debug log tail --lines=30
+   tail -30 wp-content/debug.log
    ```
 
 5. **Investigate Root Cause**
@@ -1660,7 +1661,7 @@ wp post list --post_status=scheduled --format=table
 **Review Before Publishing:**
 
 1. Content review for accuracy and tone
-2. Check for broken links: `wp link list --format=table`
+2. Check for broken links (use an external tool or broken-link-checker plugin)
 3. Review SEO metadata (if using Yoast)
 4. Verify images display correctly
 5. Test on mobile device
@@ -1708,9 +1709,8 @@ wp rewrite structure '/%year%/%monthnum%/%postname%/'
 # Flush rewrite rules
 wp rewrite flush
 
-# Regenerate 301 redirects for old URLs (if changed)
-wp plugin install redirection --activate
-wp redirect rule create 'old-url' 'new-url' --type=301
+# For 301 redirects from old URLs, configure at the web server level
+# or use a redirect plugin's admin interface (e.g., Redirection plugin)
 ```
 
 > **WARNING:** Changing permalink structure requires 301 redirects from old URLs. Update internal links and notify users.
@@ -1740,11 +1740,10 @@ add_action('init', function() {
 
 ```bash
 # Verify WP search is working
-wp search-term "keyword" --post_type=post
+wp post list --s="keyword" --post_type=post --format=table
 
-# Rebuild search index (if using search plugin)
-wp plugin activate wp-search-suggest
-wp search-suggest rebuild-index
+# Rebuild search index (plugin-dependent, e.g., ElasticPress or SearchWP)
+# wp elasticpress index --setup
 
 # Check for posts with no content (unfixed)
 wp db query "SELECT ID, post_title FROM wp_posts WHERE post_content = '' AND post_type = 'post';"
@@ -1759,11 +1758,8 @@ wp option get blog_public
 # Enable search engine visibility
 wp option update blog_public 1
 
-# Submit sitemap to Google Search Console
-wp seo-sitemap generate
-
-# List registered sitemaps
-wp sitemap list
+# Verify core sitemaps are accessible (WordPress 5.5+)
+curl -so /dev/null -w "%{http_code}" https://[CUSTOMIZE: example.com]/wp-sitemap.xml
 ```
 
 **WP-CLI Search and Replace:**
@@ -1775,8 +1771,8 @@ wp search-replace "old-text" "new-text" --dry-run  # Preview changes
 # Execute search-replace
 wp search-replace "old-text" "new-text"
 
-# Search and replace in specific posts
-wp search-replace "old" "new" --post_id=123,456,789
+# Search and replace in specific table
+wp search-replace "old" "new" wp_posts
 ```
 
 
@@ -1842,7 +1838,7 @@ wp search-replace "old" "new" --post_id=123,456,789
    tail -30 /var/log/mysql/error.log
    
    # WordPress debug log
-   wp debug log tail --lines=30
+   tail -30 wp-content/debug.log
    ```
 
 4. **Disable Recently Activated Plugins**
@@ -1927,7 +1923,7 @@ wp search-replace "old" "new" --post_id=123,456,789
 2. **Isolate the Site**
    ```bash
    # Take site offline to prevent further data exfiltration
-   # Option 1: Redirect to maintenance page
+   # Option 1: Redirect to maintenance page (requires WP-CLI 2.8+)
    wp maintenance-mode activate
    
    # Option 2: Block all traffic except admins
@@ -1964,22 +1960,22 @@ wp search-replace "old" "new" --post_id=123,456,789
 5. **Force Password Resets**
    ```bash
    # Reset all admin passwords
-   wp user list --role=administrator --format=table --field=user_login | while read user; do
+   wp user list --role=administrator --field=user_login | while read user; do
      NEW_PASS=$(openssl rand -base64 16)
-     wp user update $user --prompt=user_pass
-     echo "Reset $user to temporary password"
+     wp user update "$user" --user_pass="$NEW_PASS"
+     echo "Reset $user — communicate new password via secure channel"
    done
-   
-   # Force users to reset passwords on next login
-   wp option update force_password_reset true
+
+   # Invalidate all existing sessions
+   wp user list --field=ID | xargs -I {} wp user session destroy {} --all
    ```
 
 6. **Scan for Malware**
    ```bash
-   # Using Wordfence or other security plugin
-   wp plugin install wordfence --activate
-   wp wordfence scan full
-   
+   # Wordfence scans must be initiated through wp-admin > Wordfence > Scan
+   # For CLI-based malware scanning, use dedicated tools:
+   clamscan -r /home/wordpress/public_html/
+
    # Or use AIDE for file integrity
    aide --check > /tmp/aide-report.txt
    ```
@@ -1997,7 +1993,8 @@ wp search-replace "old" "new" --post_id=123,456,789
 8. **Clean the Site**
    ```bash
    # Remove malware files
-   wp plugin delete infected-plugin-name --deactivate
+   wp plugin deactivate infected-plugin-name
+   wp plugin delete infected-plugin-name
    
    # Update all plugins, themes, WordPress core
    wp core update
@@ -2121,7 +2118,7 @@ wp search-replace "old" "new" --post_id=123,456,789
    wp db optimize
    
    # Delete expired transients
-   wp transient delete --expired --all
+   wp transient delete --expired
    ```
 
 5. **Clear Caches**
@@ -2256,7 +2253,7 @@ Date: [Date]
    mysql -u root -p <<EOF
    CREATE DATABASE [CUSTOMIZE: wordpress_db];
    CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
-   GRANT ALL PRIVILEGES ON [CUSTOMIZE: wordpress_db].* TO '[CUSTOMIZE: wp_user]'@'localhost';
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: wordpress_db].* TO '[CUSTOMIZE: wp_user]'@'localhost';
    FLUSH PRIVILEGES;
    EOF
    
@@ -2297,7 +2294,7 @@ Date: [Date]
    
    # Check database
    wp db check
-   wp db table list --all-tables | head
+   wp db tables --all-tables | head
    
    # Check plugins
    wp plugin list --status=active --format=table
@@ -2392,7 +2389,7 @@ Date: [Date]
    wp db check
    
    # Count posts (compare to expected)
-   wp post list --post_type=all --format=count
+   wp post list --post_type=any --format=count
    
    # Verify users
    wp user list --format=table
@@ -2404,7 +2401,7 @@ Date: [Date]
    wp option update last_update_check '0'
    
    # Clear all caches
-   wp cache flush --global
+   wp cache flush
    wp w3-total-cache flush all
    wp redis flush-db
    ```
@@ -2774,7 +2771,8 @@ $table_prefix = 'wp_';  // Default; non-default prefixes are optional obscurity 
 // ============================================================
 // LANGUAGE AND LOCALE
 // ============================================================
-define('WPLANG', 'en_US');
+// WPLANG is deprecated since WordPress 4.0. Set language via Settings > General or:
+// wp language core install en_US && wp site switch-language en_US
 
 // ============================================================
 // WORDPRESS SECURITY
@@ -2804,7 +2802,7 @@ define('DISABLE_WP_CRON', true);  // Use system cron
 // DEBUGGING (PRODUCTION = false)
 // ============================================================
 define('WP_DEBUG', false);
-define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_LOG', false);   // Set both WP_DEBUG and WP_DEBUG_LOG to true when debugging
 define('WP_DEBUG_DISPLAY', false);
 define('SCRIPT_DEBUG', false);
 
@@ -2824,7 +2822,6 @@ if (!defined('ABSPATH')) {
 // WORDPRESS CONFIGURATION LOADED - Load wp-settings.php
 // ============================================================
 require_once(ABSPATH . 'wp-settings.php');
-?>
 ```
 
 ---
@@ -2894,6 +2891,7 @@ Do not add these symbols to `wp-config.php` hardening templates:
 - `DISALLOW_PLUGIN_ACTIVATION` (not a core constant)
 - `SECURE_LOGGED_IN_COOKIE` (not a core constant)
 - `define('XMLRPC_REQUEST', false)` (`XMLRPC_REQUEST` is request-context only)
+- `WPLANG` (deprecated since WordPress 4.0; set language via Settings > General or WP-CLI `wp site switch-language`)
 
 Use `DISALLOW_FILE_EDIT` as baseline, and use `DISALLOW_FILE_MODS` only when deployment/update workflows are externalized.
 
