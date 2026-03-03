@@ -1,4 +1,4 @@
-name: Generate PDF, Word & EPUB Documents
+name: Refresh Markdown Metadata
 
 on:
   push:
@@ -6,61 +6,25 @@ on:
     paths:
       - '**.md'
       - '.github/workflows/generate-docs.yml'
-      - '.github/pandoc/**'
+    paths-ignore:
+      - '**/ROADMAP.md'
+      - '**/roadmap.md'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: generate-docs
+  group: refresh-markdown-metadata
   cancel-in-progress: true
 
 jobs:
-  generate-docs:
+  refresh-markdown:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Pandoc
-        run: |
-          PANDOC_VER=3.6.3
-          wget -q "https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb"
-          sudo dpkg -i "pandoc-${PANDOC_VER}-1-amd64.deb"
-          rm "pandoc-${PANDOC_VER}-1-amd64.deb"
-
-      - name: Install LaTeX and fonts
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            texlive-xetex \
-            texlive-latex-recommended \
-            texlive-fonts-recommended \
-            texlive-fonts-extra \
-            texlive-latex-extra \
-            lmodern \
-            fonts-noto-core \
-            fonts-noto-extra
-
-      - name: Install eisvogel template
-        run: |
-          mkdir -p ~/.pandoc/templates
-          TMPDIR_EIS=$(mktemp -d)
-          curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz" \
-            | tar -xz -C "$TMPDIR_EIS"
-          find "$TMPDIR_EIS" -name "*.latex" -exec cp {} ~/.pandoc/templates/ \;
-          rm -rf "$TMPDIR_EIS"
-          ls ~/.pandoc/templates/
-
-      - name: Bootstrap reference.docx
-        run: |
-          mkdir -p .github/pandoc
-          if [ ! -f .github/pandoc/reference.docx ]; then
-            pandoc --print-default-data-file reference.docx > .github/pandoc/reference.docx
-            echo "Created default reference.docx (customise via Word to restyle DOCX output)"
-          fi
 
       - name: Update date in frontmatter
         run: |
@@ -70,62 +34,19 @@ jobs:
             | while read -r md_file; do
               if head -1 "$md_file" | grep -q '^---$'; then
                 sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
-                echo "  Updated date → $today in $md_file"
+                echo "  Updated date -> $today in $md_file"
               fi
             done
 
-      - name: Convert Markdown files
-        run: |
-          find . \
-            -name "*.md" \
-            -not -name "README.md" \
-            -not -path "./.github/*" \
-            -not -path "./node_modules/*" \
-            | sort \
-            | while read -r md_file; do
-
-              base="${md_file%.md}"
-
-              # Read version from YAML frontmatter
-              version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p }' "$md_file")
-              display_date="Version ${version} — $(date '+%B %-d, %Y')"
-
-              echo "▶ $md_file (${display_date})"
-
-              # PDF via eisvogel + XeLaTeX
-              pandoc "$md_file" \
-                --template eisvogel \
-                --pdf-engine xelatex \
-                --defaults ".github/pandoc/pdf-defaults.yaml" \
-                --metadata "date=${display_date}" \
-                --toc --toc-depth=3 \
-                -o "${base}.pdf" \
-                && echo "  ✓ PDF" || echo "  ✗ PDF failed"
-
-              # DOCX via reference template
-              pandoc "$md_file" \
-                --reference-doc=".github/pandoc/reference.docx" \
-                --toc --toc-depth=3 \
-                -o "${base}.docx" \
-                && echo "  ✓ DOCX" || echo "  ✗ DOCX failed"
-
-              # EPUB
-              pandoc "$md_file" \
-                --toc --toc-depth=3 \
-                --epub-title-page=false \
-                -o "${base}.epub" \
-                && echo "  ✓ EPUB" || echo "  ✗ EPUB failed"
-            done
-
-      - name: Commit generated documents
+      - name: Commit markdown metadata updates
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add *.md *.pdf *.docx *.epub .github/pandoc/reference.docx 2>/dev/null || true
+          git add '*.md' 2>/dev/null || true
           if ! git diff --staged --quiet; then
-            git commit -m "docs: regenerate PDF, Word, and EPUB documents [skip ci]"
+            git commit -m "docs: refresh markdown metadata [skip ci]"
             git pull --rebase origin main
             git push
           else
-            echo "No changes to commit"
+            echo "No markdown metadata changes to commit"
           fi
