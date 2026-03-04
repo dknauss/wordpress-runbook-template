@@ -65,8 +65,8 @@ jobs:
       - name: Update date in frontmatter
         run: |
           today=$(date '+%B %-d, %Y')
-          find . -name "*.md" -not -name "README.md" \
-            -not -path "./.github/*" -not -path "./node_modules/*" \
+          find . -name "*.md" -not -name "README.md" -not -name "ROADMAP.md" \
+            -not -path "./.github/*" -not -path "./node_modules/*" -not -path "./docs/*" \
             | while read -r md_file; do
               if head -1 "$md_file" | grep -q '^---$'; then
                 sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
@@ -79,8 +79,10 @@ jobs:
           find . \
             -name "*.md" \
             -not -name "README.md" \
+            -not -name "ROADMAP.md" \
             -not -path "./.github/*" \
             -not -path "./node_modules/*" \
+            -not -path "./docs/*" \
             | sort \
             | while read -r md_file; do
 
