@@ -42,7 +42,9 @@ jobs:
             texlive-latex-extra \
             lmodern \
             fonts-noto-core \
-            fonts-noto-extra
+            fonts-noto-extra \
+            epubcheck \
+            poppler-utils
 
       - name: Install eisvogel template
         run: |
@@ -109,6 +111,27 @@ jobs:
             --metadata "lang=en-US" \
             -o "${base}.epub"
           echo "  ✓ EPUB"
+
+      - name: Validate generated outputs
+        run: |
+          md_file="WP-Operations-Runbook.md"
+          base="${md_file%.md}"
+
+          for artifact in "${base}.docx" "${base}.pdf" "${base}.epub"; do
+            if [ ! -s "$artifact" ]; then
+              echo "Missing or empty artifact: $artifact"
+              exit 1
+            fi
+          done
+
+          echo "Running EPUB validation..."
+          epubcheck "${base}.epub"
+
+          echo "Running PDF validation..."
+          pdfinfo_out=$(pdfinfo "${base}.pdf")
+          echo "$pdfinfo_out"
+          echo "$pdfinfo_out" | grep -Eq '^Pages:[[:space:]]+[1-9][0-9]*$'
+          echo "$pdfinfo_out" | grep -Eq '^PDF version:[[:space:]]+[0-9.]+$'
 
       - name: Commit generated documents
         run: |
