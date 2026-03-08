@@ -1096,7 +1096,7 @@ wp transient delete --expired
    - Verify form submissions work
    - Check database connections
 
-### 6.6 WordPress Cron (WP-Cron) Management
+### 6.6 WordPress Cron (WP-Cron) Management {#wordpress-cron-wp-cron-management}
 
 **Purpose:**
 Ensure scheduled WordPress tasks run predictably by using system cron with WP-CLI, while reducing external exposure of `wp-cron.php`.
@@ -1690,7 +1690,7 @@ Use [Section 8.3](#rollback-procedure) if deployment-level rollback is required.
 - Data mismatch is detected after migration.
 - Post-migration errors persist after cache flush and URL correction.
 
-### 8.3 Rollback Procedure
+### 8.3 Rollback Procedure {#rollback-procedure}
 
 **Time Estimate:** 15-30 minutes
 
@@ -2020,7 +2020,7 @@ Lifecycle metadata for incident response procedures is tracked in [Appendix E](#
 | **Medium (P3)** | Non-critical feature broken or degraded | 4 hours | Search not working, theme display issues | [§10.5](#performance-degradation) |
 | **Low (P4)** | Minor issues, cosmetic or UX | 1-2 business days | Typo, formatting issue, slow report generation | — |
 
-### 10.2 Site Down / 500 Error Triage
+### 10.2 Site Down / 500 Error Triage {#site-down-500-error-triage}
 
 **Time Estimate:** 5-15 minutes to identify root cause (longer if plugin isolation or database repair is required)
 
@@ -2119,7 +2119,7 @@ tail -20 /var/log/php-errors.log
 
 Confirm admin login and at least one critical business workflow (e.g., [CUSTOMIZE: test checkout, form submission, or user registration]) before closing incident.
 
-### 10.3 Security Breach Response
+### 10.3 Security Breach Response {#security-breach-response}
 
 **Time Estimate:** 1-4 hours depending on scope
 
@@ -2252,7 +2252,7 @@ Then confirm:
 
 After all validation checks pass, initiate a full post-incident review per [Section 10.6](#post-incident-review), including affected-user notification and a security audit schedule. For affected-user communications, follow the editorial standards in the [WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide) §7 for vulnerability severity language and disclosure practices.
 
-### 10.4 Incident Roles and Escalation Path
+### 10.4 Incident Roles and Escalation Path {#incident-roles-and-escalation-path}
 
 **Incident Role Cards:**
 
@@ -2294,7 +2294,7 @@ After all validation checks pass, initiate a full post-incident review per [Sect
 
 > **Note:** The ordering above reflects escalation depth, not engagement sequence. The Incident Commander role is typically assumed by the On-Call SysAdmin at incident start and formally handed off when a senior IC is engaged.
 
-### 10.5 Performance Degradation
+### 10.5 Performance Degradation {#performance-degradation}
 
 **Time Estimate:** 15-30 minutes to identify cause
 
@@ -2371,7 +2371,7 @@ curl -I https://[CUSTOMIZE: example.com] | grep -i Cache-Control
 
 Confirm response time and host utilization return to baseline for at least 15 minutes.
 
-### 10.6 Post-Incident Review
+### 10.6 Post-Incident Review {#post-incident-review}
 
 **Complete within 24 hours of incident resolution**
 
@@ -2442,7 +2442,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in [Appendix E](#
 
 > **NOTE:** These targets assume proper backups and infrastructure in place. Regular testing is critical.
 
-### 11.2 Full Site Restore from Backup
+### 11.2 Full Site Restore from Backup {#full-site-restore-from-backup}
 
 **Time Estimate:** 1-1.5 hours
 
