@@ -755,7 +755,7 @@ find /home/wordpress/public_html -name "*.php" -type f -mtime -7
 
 ## Section 6: Routine Maintenance
 
-Lifecycle metadata for critical maintenance procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+Lifecycle metadata for critical maintenance procedures is tracked in Appendix E.
 
 ### 6.1 Maintenance Calendar
 
@@ -1525,7 +1525,7 @@ sudo chown root:root /usr/local/bin/wordpress-backup.sh
 
 ## Section 8: Deployment Procedures
 
-Lifecycle metadata for deployment procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+Lifecycle metadata for deployment procedures is tracked in Appendix E.
 
 ### 8.1 Code Deployment
 
@@ -2002,7 +2002,7 @@ wp search-replace "old" "new" wp_posts
 
 ## Section 10: Incident Response
 
-Lifecycle metadata for incident response procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+Lifecycle metadata for incident response procedures is tracked in Appendix E.
 
 **Prerequisites for all incident procedures below:**
 - SSH access to the production host with `sudo` privileges
@@ -2427,7 +2427,7 @@ Date: [Date]
 
 ## Section 11: Disaster Recovery
 
-Lifecycle metadata for disaster recovery procedures is tracked in [Appendix E](#appendix-e-procedure-ownership-and-validation-matrix).
+Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
 ### 11.1 Recovery Objectives
 
