@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '**.md'
+      - 'WP-Operations-Runbook.md'
       - '.github/workflows/generate-docs.yml'
       - '.github/pandoc/**'
   workflow_dispatch:
@@ -64,66 +64,57 @@ jobs:
 
       - name: Update date in frontmatter
         run: |
+          md_file="WP-Operations-Runbook.md"
           today=$(date '+%B %-d, %Y')
-          find . -name "*.md" -not -name "README.md" -not -name "ROADMAP.md" \
-            -not -path "./.github/*" -not -path "./node_modules/*" -not -path "./docs/*" \
-            | while read -r md_file; do
-              if head -1 "$md_file" | grep -q '^---$'; then
-                sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
-                echo "  Updated date → $today in $md_file"
-              fi
-            done
+          if head -1 "$md_file" | grep -q '^---$'; then
+            sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
+            echo "  Updated date -> $today in $md_file"
+          fi
 
-      - name: Convert Markdown files
+      - name: Convert primary document
         run: |
-          find . \
-            -name "*.md" \
-            -not -name "README.md" \
-            -not -name "ROADMAP.md" \
-            -not -path "./.github/*" \
-            -not -path "./node_modules/*" \
-            -not -path "./docs/*" \
-            | sort \
-            | while read -r md_file; do
+          md_file="WP-Operations-Runbook.md"
+          base="${md_file%.md}"
+          docx_file="${base}.docx"
 
-              base="${md_file%.md}"
+          # Read version from YAML frontmatter
+          version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p }' "$md_file")
+          display_date="Version ${version} — $(date '+%B %-d, %Y')"
 
-              # Read version from YAML frontmatter
-              version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p }' "$md_file")
-              display_date="Version ${version} — $(date '+%B %-d, %Y')"
+          echo "▶ $md_file (${display_date})"
 
-              echo "▶ $md_file (${display_date})"
+          # 1) Markdown -> DOCX (intermediary template layer)
+          pandoc "$md_file" \
+            --reference-doc=".github/pandoc/reference.docx" \
+            --toc --toc-depth=3 \
+            -o "$docx_file"
+          echo "  ✓ DOCX"
 
-              # PDF via eisvogel + XeLaTeX
-              pandoc "$md_file" \
-                --template eisvogel \
-                --pdf-engine xelatex \
-                --defaults ".github/pandoc/pdf-defaults.yaml" \
-                --metadata "date=${display_date}" \
-                --toc --toc-depth=3 \
-                -o "${base}.pdf" \
-                && echo "  ✓ PDF" || echo "  ✗ PDF failed"
+          # 2) DOCX -> PDF
+          pandoc "$docx_file" \
+            --from docx \
+            --template eisvogel \
+            --pdf-engine xelatex \
+            --defaults ".github/pandoc/pdf-defaults.yaml" \
+            --metadata "date=${display_date}" \
+            --toc --toc-depth=3 \
+            -o "${base}.pdf"
+          echo "  ✓ PDF"
 
-              # DOCX via reference template
-              pandoc "$md_file" \
-                --reference-doc=".github/pandoc/reference.docx" \
-                --toc --toc-depth=3 \
-                -o "${base}.docx" \
-                && echo "  ✓ DOCX" || echo "  ✗ DOCX failed"
-
-              # EPUB
-              pandoc "$md_file" \
-                --toc --toc-depth=3 \
-                --epub-title-page=false \
-                -o "${base}.epub" \
-                && echo "  ✓ EPUB" || echo "  ✗ EPUB failed"
-            done
+          # 3) DOCX -> EPUB
+          pandoc "$docx_file" \
+            --from docx \
+            --toc --toc-depth=3 \
+            --epub-title-page=false \
+            --metadata "lang=en-US" \
+            -o "${base}.epub"
+          echo "  ✓ EPUB"
 
       - name: Commit generated documents
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add *.md *.pdf *.docx *.epub .github/pandoc/reference.docx 2>/dev/null || true
+          git add WP-Operations-Runbook.md WP-Operations-Runbook.pdf WP-Operations-Runbook.docx WP-Operations-Runbook.epub .github/pandoc/reference.docx 2>/dev/null || true
           if ! git diff --staged --quiet; then
             git commit -m "docs: regenerate PDF, Word, and EPUB documents [skip ci]"
             git pull --rebase origin main
