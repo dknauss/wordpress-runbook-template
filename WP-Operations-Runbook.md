@@ -1,7 +1,7 @@
 ---
-title: "WordPress Operations Runbook [TEMPLATE]"
+title: "WordPress Operations Runbook"
 subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
-author: "Dan Knauss"
+author: "By [CUSTOMIZE]"
 date: "March 8, 2026"
 version: "3.0"
 header-includes: |
