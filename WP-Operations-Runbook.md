@@ -833,7 +833,7 @@ wp db import backup/pre-core-update-YYYYMMDD-HHMMSS.sql
 git checkout previous-release-tag
 ```
 
-Use [Section 8.3](#83-rollback-procedure) for full rollback workflow.
+Use [Section 8.3](#rollback-procedure) for full rollback workflow.
 
 **Verification:**
 
@@ -940,7 +940,7 @@ wp db import backup/pre-plugin-update-YYYYMMDD-HHMMSS.sql
 git checkout previous-release-tag
 ```
 
-Use [Section 8.3](#83-rollback-procedure) for full rollback steps.
+Use [Section 8.3](#rollback-procedure) for full rollback steps.
 
 **Verification:**
 
@@ -1569,7 +1569,7 @@ curl -I https://[CUSTOMIZE: example.com]
 
 **Rollback:**
 
-Use [Section 8.3](#83-rollback-procedure) if post-deploy verification fails.
+Use [Section 8.3](#rollback-procedure) if post-deploy verification fails.
 
 **Verification:**
 
@@ -1676,7 +1676,7 @@ Migrate WordPress database safely between environments while preserving integrit
 wp db import backup/migration-source-YYYYMMDD.sql
 ```
 
-Use [Section 8.3](#83-rollback-procedure) if deployment-level rollback is required.
+Use [Section 8.3](#rollback-procedure) if deployment-level rollback is required.
 
 **Verification:**
 
@@ -1763,7 +1763,7 @@ Restore service quickly after a failed deployment and preserve evidence for root
 
 **Rollback:**
 
-If first rollback attempt fails, proceed to full restore in [Section 11.2](#112-full-site-restore-from-backup).
+If first rollback attempt fails, proceed to full restore in [Section 11.2](#full-site-restore-from-backup).
 
 **Verification:**
 
@@ -2008,16 +2008,16 @@ Lifecycle metadata for incident response procedures is tracked in [Appendix E](#
 - SSH access to the production host with `sudo` privileges
 - WP-CLI 2.5+ installed and accessible in `$PATH` (verify: `wp cli version`)
 - Access to monitoring dashboards and log aggregation
-- Contact list for on-call personnel (see [Section 10.4](#104-incident-roles-and-escalation-path))
-- Verified recent backup exists and restore path is documented (see [Section 11.2](#112-full-site-restore-from-backup))
+- Contact list for on-call personnel (see [Section 10.4](#incident-roles-and-escalation-path))
+- Verified recent backup exists and restore path is documented (see [Section 11.2](#full-site-restore-from-backup))
 
 ### 10.1 Severity Classification
 
 | Severity | Impact | Response Time | Example | Relevant Playbook |
 |----------|--------|----------------|---------|-------------------|
-| **Critical (P1)** | Site completely down or major data loss | 15 minutes | Database corruption, ransomware, all users locked out | [§10.2](#102-site-down--500-error-triage), [§10.3](#103-security-breach-response) |
-| **High (P2)** | Core functionality broken, partial outage | 30 minutes | Plugin causing 500 errors, login broken, media not loading | [§10.2](#102-site-down--500-error-triage), [§10.5](#105-performance-degradation) |
-| **Medium (P3)** | Non-critical feature broken or degraded | 4 hours | Search not working, theme display issues | [§10.5](#105-performance-degradation) |
+| **Critical (P1)** | Site completely down or major data loss | 15 minutes | Database corruption, ransomware, all users locked out | [§10.2](#site-down-500-error-triage), [§10.3](#security-breach-response) |
+| **High (P2)** | Core functionality broken, partial outage | 30 minutes | Plugin causing 500 errors, login broken, media not loading | [§10.2](#site-down-500-error-triage), [§10.5](#performance-degradation) |
+| **Medium (P3)** | Non-critical feature broken or degraded | 4 hours | Search not working, theme display issues | [§10.5](#performance-degradation) |
 | **Low (P4)** | Minor issues, cosmetic or UX | 1-2 business days | Typo, formatting issue, slow report generation | — |
 
 ### 10.2 Site Down / 500 Error Triage
@@ -2104,8 +2104,8 @@ Users may be unable to read content, authenticate, publish, or complete transact
 
 **Escalation:**
 
-- Escalate to [Section 10.4](#104-incident-roles-and-escalation-path) immediately if service remains down after mitigation attempts.
-- Trigger backup restore path via [Section 11.2](#112-full-site-restore-from-backup) if recovery time exceeds outage threshold.
+- Escalate to [Section 10.4](#incident-roles-and-escalation-path) immediately if service remains down after mitigation attempts.
+- Trigger backup restore path via [Section 11.2](#full-site-restore-from-backup) if recovery time exceeds outage threshold.
 - If cloud/network signals indicate platform fault, escalate to hosting provider incident channel.
 
 **Recovery Validation:**
@@ -2216,9 +2216,9 @@ Escalation: [Your contact details]
 
 **Escalation:**
 
-- Escalate immediately via [Section 10.4](#104-incident-roles-and-escalation-path) to Security Officer and Incident Commander.
+- Escalate immediately via [Section 10.4](#incident-roles-and-escalation-path) to Security Officer and Incident Commander.
 - If regulated data may be exposed, involve legal/compliance workflow before public disclosure.
-- If compromise cannot be contained quickly, execute disaster recovery path in [Section 11.2](#112-full-site-restore-from-backup).
+- If compromise cannot be contained quickly, execute disaster recovery path in [Section 11.2](#full-site-restore-from-backup).
 
 **Recovery Validation:**
 
@@ -2248,9 +2248,9 @@ Then confirm:
 - no unauthorized admin accounts remain;
 - malware scans return clean results;
 - site behavior is normal for at least one monitoring window;
-- incident report is completed in [Section 10.6](#106-post-incident-review).
+- incident report is completed in [Section 10.6](#post-incident-review).
 
-After all validation checks pass, initiate a full post-incident review per [Section 10.6](#106-post-incident-review), including affected-user notification and a security audit schedule. For affected-user communications, follow the editorial standards in the [WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide) §7 for vulnerability severity language and disclosure practices.
+After all validation checks pass, initiate a full post-incident review per [Section 10.6](#post-incident-review), including affected-user notification and a security audit schedule. For affected-user communications, follow the editorial standards in the [WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide) §7 for vulnerability severity language and disclosure practices.
 
 ### 10.4 Incident Roles and Escalation Path
 
@@ -2335,7 +2335,7 @@ Users experience slow page loads, failed submissions, and reduced admin producti
    wp db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload = 'yes' ORDER BY size DESC LIMIT 10;"
    ```
 
-If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §7.2 for guidance on replacing it with a system cron job, and [Section 6.6](#66-wordpress-cron-wp-cron-management) for the operational procedure.
+If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §7.2 for guidance on replacing it with a system cron job, and [Section 6.6](#wordpress-cron-wp-cron-management) for the operational procedure.
 
 **Immediate Mitigation:**
 
@@ -2355,7 +2355,7 @@ If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guid
 
 **Escalation:**
 
-- Escalate via [Section 10.4](#104-incident-roles-and-escalation-path) if response times remain above SLO after mitigation window.
+- Escalate via [Section 10.4](#incident-roles-and-escalation-path) if response times remain above SLO after mitigation window.
 - Escalate to DBA when slow query volume persists despite cache/optimization actions.
 - Escalate to infrastructure owner when host CPU/memory/disk saturation cannot be relieved at application layer.
 
@@ -3275,4 +3275,3 @@ To suggest improvements to this runbook, please contact [CUSTOMIZE: owner email]
 ---
 
 *This WordPress Operations Runbook is a comprehensive guide for managing WordPress installations in production environments. Regular review and updates are essential. All procedures should be tested in staging before implementation in production.*
-
