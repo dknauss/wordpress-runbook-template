@@ -4,6 +4,9 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+### Changed
+- Replaced the repo-local document-generation workflow with a caller to the shared reusable workflow in `ai-assisted-docs`, keeping the primary markdown source and generated artifact names unchanged.
+
 ### Fixed
 - Added missing inline `# WARNING:` comments before 10 destructive WP-CLI commands across sections 4, 6, 8, 9, 10, and 11. Commands fixed: `wp db import`, `wp search-replace` (4 instances), `wp post delete --force`, `wp comment delete --force`, `wp rewrite flush`, `wp plugin delete`, `wp user delete`, `wp db reset --yes`, `wp option update home/siteurl` (2 instances). Caught by BDD cycle test against `wordpress-runbook-ops` scenarios in [ai-assisted-docs](https://github.com/dknauss/ai-assisted-docs/blob/main/scenarios/test-runs/2026-03-11-runbook-ops-domain-migration.md).
 
