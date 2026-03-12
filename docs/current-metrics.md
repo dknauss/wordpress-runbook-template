@@ -18,9 +18,9 @@ Last verified: 2026-03-12
 | Blockquote WARNING callouts | 15 | `grep -c '> \*\*WARNING:\*\*' WP-Operations-Runbook.md` | v3.0 |
 | `[CUSTOMIZE: ...]` placeholders | 201 | `grep -c '\[CUSTOMIZE:' WP-Operations-Runbook.md` | v3.0 |
 | Plugin-dependent annotations | 7 | `grep -c '# Plugin-dependent' WP-Operations-Runbook.md` | v3.0 |
-| Code fences (total) | 164 | `grep -c '^```' WP-Operations-Runbook.md` | v3.0 |
-| Opening fences (with language tag) | 77 | `grep -cE '^```[a-z]' WP-Operations-Runbook.md` | v3.0 |
-| Bare closing fences | 87 | `grep -cE '^```$' WP-Operations-Runbook.md` | v3.0 |
+| Code fences (total) | 164 | `grep -c '^\`\`\`' WP-Operations-Runbook.md` | v3.0 |
+| Opening fences (with language tag) | 77 | `grep -cE '^\`\`\`[a-z]' WP-Operations-Runbook.md` | v3.0 |
+| Bare closing fences | 87 | `grep -cE '^\`\`\`$' WP-Operations-Runbook.md` | v3.0 |
 | Output formats | 4 | Markdown, DOCX, EPUB, PDF | v3.0 |
 
 ## Safety Ratios

@@ -13,6 +13,7 @@ checks=0
 
 while IFS=$'\t' read -r fact expected command; do
   checks=$((checks + 1))
+  command="$(printf '%s' "$command" | sed "s/\\\\\`/\`/g")"
   expected_clean="${expected//,/}"
   actual_raw="$(bash -lc "$command" 2>/dev/null || true)"
   actual_clean="$(printf '%s\n' "$actual_raw" | grep -Eo '[0-9][0-9,]*' | head -n1 | tr -d ',' || true)"
@@ -32,7 +33,7 @@ while IFS=$'\t' read -r fact expected command; do
   fi
 done < <(
   perl -ne '
-    if (/^\|\s*(.*?)\s*\|\s*([0-9][0-9,]*)\s*\|\s*`(.*)`\s*\|/) {
+    if (/^\|\s*(.*?)\s*\|\s*([0-9][0-9,]*)\s*\|\s*`((?:\\`|[^`])*)`\s*\|/) {
       print "$1\t$2\t$3\n";
     }
   ' "$metrics_file"
