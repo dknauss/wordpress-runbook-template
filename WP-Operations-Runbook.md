@@ -441,9 +441,10 @@ wordpress-repo/
 4. **Import to Staging**
    ```bash
    # On staging server
+   # WARNING: This overwrites the staging database with production data.
    wp db import prod-dump.sql
-   
-   # Update WordPress URLs (critical for staging)
+
+   # WARNING: This modifies all URL references across all database tables.
    wp search-replace "https://example.com" "https://staging.example.com" --all-tables
    ```
 
@@ -984,7 +985,7 @@ wp db query "SHOW TABLE STATUS;"
 # Count revisions
 wp db query "SELECT COUNT(*) AS revision_count FROM $(wp db prefix)posts WHERE post_type = 'revision';"
 
-# Delete all revisions
+# WARNING: This permanently deletes all post revisions. They cannot be recovered.
 wp post list --post_type=revision --format=ids | xargs wp post delete --force
 ```
 
@@ -999,7 +1000,7 @@ define('WP_POST_REVISIONS', 5);
 # List spam comments
 wp comment list --status=spam --format=table --fields=comment_ID,comment_author,comment_date
 
-# Delete spam comments
+# WARNING: This permanently deletes all spam comments. They cannot be recovered.
 wp comment delete $(wp comment list --status=spam --format=ids) --force
 ```
 
@@ -1635,10 +1636,10 @@ Migrate WordPress database safely between environments while preserving integrit
 
 5. **Update WordPress URLs** (if hostname changed)
    ```bash
-   # Search and replace old domain with new
+   # WARNING: This modifies all URL references across all database tables.
    wp search-replace "https://old.example.com" "https://new.example.com" --all-tables
 
-   # Update WordPress options
+   # WARNING: Incorrect URLs here will make the site inaccessible via wp-admin.
    wp option update home "https://[CUSTOMIZE: new.example.com]"
    wp option update siteurl "https://[CUSTOMIZE: new.example.com]"
    ```
@@ -1928,7 +1929,7 @@ wp option get permalink_structure
 # Change permalink structure (takes effect immediately)
 wp rewrite structure '/%year%/%monthnum%/%postname%/'
 
-# Flush rewrite rules
+# WARNING: This regenerates rewrite rules and may modify .htaccess or server config.
 wp rewrite flush
 
 # For 301 redirects from old URLs, configure at the web server level
@@ -1990,10 +1991,10 @@ curl -so /dev/null -w "%{http_code}" https://[CUSTOMIZE: example.com]/wp-sitemap
 # Search for content
 wp search-replace "old-text" "new-text" --dry-run  # Preview changes
 
-# Execute search-replace
+# WARNING: This permanently modifies matching content across all tables.
 wp search-replace "old-text" "new-text"
 
-# Search and replace in specific table
+# WARNING: This permanently modifies matching content in wp_posts.
 wp search-replace "old" "new" wp_posts
 ```
 
@@ -2188,12 +2189,13 @@ Escalation: [Your contact details]
 
 1. Disable compromised plugins/themes and remove confirmed malicious files after evidence capture.
    ```bash
+   # WARNING: Deactivating and deleting a plugin removes it permanently. Capture forensic evidence first.
    wp plugin deactivate infected-plugin-name
    wp plugin delete infected-plugin-name
    ```
 2. Delete rogue accounts and reassign their content.
    ```bash
-   # Compare current admin list against known-good roster, then remove unauthorized accounts:
+   # WARNING: This permanently deletes the user account. Content is reassigned, not deleted.
    wp user delete [SUSPICIOUS_USER_ID] --reassign=[ADMIN_ID]
    ```
 3. Reset privileged credentials and terminate active sessions.
@@ -2540,11 +2542,11 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
 7. **Update URLs** (if hostname changed)
    ```bash
-   # Update WordPress site URL
+   # WARNING: Incorrect URLs here will make the site inaccessible via wp-admin.
    wp option update home "https://[CUSTOMIZE: example.com]"
    wp option update siteurl "https://[CUSTOMIZE: example.com]"
-   
-   # Search and replace old URLs
+
+   # WARNING: This modifies all URL references across all database tables.
    wp search-replace "https://old.example.com" "https://[CUSTOMIZE: example.com]" --all-tables
    ```
 
@@ -2599,10 +2601,10 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
 3. **Drop Current Database Tables**
    ```bash
-   # Drop all tables (careful!)
+   # WARNING: This drops ALL database tables and destroys all site content. Ensure the backup in step 2 completed successfully.
    wp db reset --yes
-   
-   # Or manually
+
+   # Or manually — WARNING: same effect as above, irreversible without backup.
    mysql -u root -p [CUSTOMIZE: wordpress_db] <<EOF
    DROP TABLE IF EXISTS wp_commentmeta;
    DROP TABLE IF EXISTS wp_comments;
