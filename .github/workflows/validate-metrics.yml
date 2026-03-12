@@ -1,0 +1,27 @@
+name: Validate Metrics
+
+on:
+  pull_request:
+    paths:
+      - 'WP-Operations-Runbook.md'
+      - 'docs/current-metrics.md'
+      - '.github/scripts/verify-metrics.sh'
+      - '.github/workflows/validate-metrics.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'WP-Operations-Runbook.md'
+      - 'docs/current-metrics.md'
+      - '.github/scripts/verify-metrics.sh'
+      - '.github/workflows/validate-metrics.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify metrics values
+        run: bash .github/scripts/verify-metrics.sh docs/current-metrics.md

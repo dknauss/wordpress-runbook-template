@@ -12,7 +12,7 @@ Last verified: 2026-03-12
 | Major sections | 11 | `grep -cE '^## Section' WP-Operations-Runbook.md` | v3.0 |
 | Appendices | 5 | `grep -cE '^## Appendix' WP-Operations-Runbook.md` | v3.0 |
 | WP-CLI commands (total) | 157 | `grep -cE '^\s*wp ' WP-Operations-Runbook.md` | v3.0-post |
-| Destructive WP-CLI commands | 54 | `grep -cE '^\s*wp (search-replace\|db import\|db reset\|db query\|post delete\|comment delete\|user delete\|plugin delete\|plugin deactivate\|option update\|option delete\|rewrite flush\|transient delete\|cache flush\|eval\|eval-file)' WP-Operations-Runbook.md` | v3.0-post |
+| Destructive WP-CLI commands | 54 | `grep -cE '^\s*wp (search-replace|db import|db reset|db query|post delete|comment delete|user delete|plugin delete|plugin deactivate|option update|option delete|rewrite flush|transient delete|cache flush|eval|eval-file)' WP-Operations-Runbook.md` | v3.0-post |
 | Commented-out WP-CLI commands | 13 | `grep -cE '^\s*# wp ' WP-Operations-Runbook.md` | v3.0-post |
 | Inline WARNING comments (`# WARNING:`) | 16 | `grep -c '# WARNING:' WP-Operations-Runbook.md` | v3.0-post |
 | Blockquote WARNING callouts | 15 | `grep -c '> \*\*WARNING:\*\*' WP-Operations-Runbook.md` | v3.0 |
