@@ -123,7 +123,7 @@ Use the following controls to keep this runbook operationally reliable:
 |----------|-------|
 | **Domain** | [CUSTOMIZE: example.com] |
 | **Site Name** | [CUSTOMIZE: My WordPress Site] |
-| **WordPress Version** | [CUSTOMIZE: current supported release, e.g. 7.0+] |
+| **WordPress Version** | [CUSTOMIZE: current supported release, e.g. WordPress 7.0.x] |
 | **PHP Version** | [CUSTOMIZE: 8.3+ recommended; test 8.4 in staging first] |
 | **Server OS** | [CUSTOMIZE: Ubuntu 22.04 LTS] |
 | **Hosting Type** | [CUSTOMIZE: Self-hosted/Managed/VPS] |
