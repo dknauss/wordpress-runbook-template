@@ -5,6 +5,9 @@ All notable changes to the WordPress Operations Runbook template.
 ## Unreleased
 
 ### Changed
+- Reworked backup, restore, rollback, and deployment procedures to remove unsafe raw-datadir deletion, normalize backup paths and artifact formats, require known-good filesystem artifacts for rollback, and keep live plugin/theme updates out of deployment workflows.
+- Expanded authentication guidance to cover privileged roles beyond single-site administrators, added a dedicated action-gated reauthentication / sudo-mode procedure, and clarified break-glass and application-password handling during recovery and incident response.
+- Updated PHP guidance and environment placeholders toward the current supported release posture, clarified self-managed versus managed-hosting assumptions, and aligned glossary/operator terminology around `Dashboard`, `WP-Cron`, `Multisite`, and related security terms.
 - Corrected WP-CLI post-status and term-deletion examples, removed invalid or misleading SMTP and `wp-config.php` examples, fixed PHP package guidance, normalized Dashboard casing, and replaced hard-coded table-prefix examples where practical.
 - Added centered page numbering to `.github/pandoc/reference.docx` so DOCX-derived PDF output includes footer page numbers through the shared generation pipeline.
 - Replaced the repo-local document-generation workflow with a caller to the shared reusable workflow in `ai-assisted-docs`, keeping the primary markdown source and generated artifact names unchanged.

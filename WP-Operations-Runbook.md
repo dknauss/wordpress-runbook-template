@@ -123,8 +123,8 @@ Use the following controls to keep this runbook operationally reliable:
 |----------|-------|
 | **Domain** | [CUSTOMIZE: example.com] |
 | **Site Name** | [CUSTOMIZE: My WordPress Site] |
-| **WordPress Version** | [CUSTOMIZE: 6.4+] |
-| **PHP Version** | [CUSTOMIZE: 8.2+] |
+| **WordPress Version** | [CUSTOMIZE: current supported release, e.g. 7.0+] |
+| **PHP Version** | [CUSTOMIZE: 8.3+ recommended; test 8.4 in staging first] |
 | **Server OS** | [CUSTOMIZE: Ubuntu 22.04 LTS] |
 | **Hosting Type** | [CUSTOMIZE: Self-hosted/Managed/VPS] |
 | **Server Hostname** | [CUSTOMIZE: wp-prod-01.example.com] |
@@ -139,7 +139,7 @@ Use the following controls to keep this runbook operationally reliable:
 |-----------------|------------------|-------------------|-------|
 | **Database credentials** | [CUSTOMIZE: Secure vault] | Every 90 days | [CUSTOMIZE] |
 | **SFTP/SSH keys** | [CUSTOMIZE: Secure vault] | Every 180 days | [CUSTOMIZE] |
-| **WP-CLI OAuth token** | [CUSTOMIZE: ~/.wp-cli/config.yml] | Every 180 days | [CUSTOMIZE] |
+| **Application passwords (if used)** | [CUSTOMIZE: Secure vault + owner inventory] | Review quarterly; revoke on incident | [CUSTOMIZE] |
 | **Third-party API keys** | [CUSTOMIZE: wp-config.php env vars] | Every 180 days | [CUSTOMIZE] |
 | **SSL certificates** | [CUSTOMIZE: /etc/letsencrypt] | Auto-renew 30 days before expiry | [CUSTOMIZE] |
 
@@ -156,6 +156,8 @@ Use the following controls to keep this runbook operationally reliable:
 ---
 
 ## Section 3: Environment Reference
+
+Unless a procedure explicitly says otherwise, host-level commands in this runbook assume a self-managed Linux deployment with shell access, direct service control, local backup paths, and direct database administration. On managed hosting platforms, use the provider's equivalent controls or provider-escalation path instead of forcing self-managed commands onto an environment that does not expose them.
 
 ### 3.1 Architecture Overview: LEMP Stack
 
@@ -195,7 +197,7 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 | Service | Version | Port | User | Config Path | Log Path |
 |---------|---------|------|------|-------------|----------|
 | **Nginx** | [CUSTOMIZE: 1.24+] | 80, 443 | `www-data` | `/etc/nginx/nginx.conf` | `/var/log/nginx/` |
-| **PHP-FPM** | [CUSTOMIZE: 8.2+] | 9000 (socket) | `www-data` | `/etc/php/[CUSTOMIZE: 8.x]/fpm/php.ini` | `/var/log/php*.log` |
+| **PHP-FPM** | [CUSTOMIZE: 8.3+] | 9000 (socket) | `www-data` | `/etc/php/[CUSTOMIZE: 8.x]/fpm/php.ini` | `/var/log/php*.log` |
 | **MySQL** | [CUSTOMIZE: 8.0+] | 3306 (local) | `mysql` | `/etc/mysql/mysql.conf.d/mysqld.cnf` | `/var/log/mysql/error.log` |
 | **Redis** | [CUSTOMIZE: 7.0+] | 6379 | `redis` | `/etc/redis/redis.conf` | `/var/log/redis/redis-server.log` |
 
@@ -345,8 +347,9 @@ wordpress-repo/
    
    # Install/update dependencies
    composer install --no-dev
-   wp plugin update --all
-   wp theme update --all
+
+   # Do not introduce live plugin/theme version drift during deployment.
+   # Patch plugins/themes through the dedicated update workflow instead.
    
    # Run database migrations if needed
    wp db query < migrations/pending-migration.sql
@@ -372,7 +375,9 @@ wordpress-repo/
    cd /home/wordpress/public_html
    
    # Create backup before deploy
-   wp db export backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql
+   TS=$(date +%Y%m%d-%H%M%S)
+   wp db export /home/wordpress/backup/pre-deploy-${TS}.sql
+   gzip /home/wordpress/backup/pre-deploy-${TS}.sql
    
    # Pull latest code
    git fetch origin
@@ -381,12 +386,8 @@ wordpress-repo/
    # Install dependencies
    composer install --no-dev
    
-   # Update plugins (one by one, monitor after each)
-   wp plugin update wp-plugin-name-1
-   wp plugin update wp-plugin-name-2
-   
-   # Update themes if changed
-   wp theme update custom-theme
+   # Do not run live plugin/theme updates during deployment.
+   # Deploy only the approved release artifact.
    ```
 
 6. **Post-Deployment Verification**
@@ -422,7 +423,7 @@ wordpress-repo/
    ```bash
    ssh [CUSTOMIZE: staging-user@staging.example.com]
    cd /home/wordpress
-   wp db export backup/staging-pre-sync-$(date +%Y%m%d-%H%M%S).sql
+   wp db export /home/wordpress/backup/staging-pre-sync-$(date +%Y%m%d-%H%M%S).sql
    ```
 
 2. **Export Production Database**
@@ -666,7 +667,7 @@ awk '/wp-json/ {print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn
 
 ### 5.5 Administrator Two-Factor Authentication (2FA)
 
-**Objective:** Require 2FA for all administrator-capable accounts and maintain a documented break-glass recovery path.
+**Objective:** Require 2FA for all privileged accounts and maintain a documented break-glass recovery path.
 
 See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §5.1 for the compliance audit checklist and configuration rationale.
 
@@ -682,15 +683,21 @@ See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 wp plugin install two-factor --activate
 ```
 
-2. In plugin settings, enforce 2FA for `administrator` (and any additional privileged roles).
+2. In plugin settings, enforce 2FA for all privileged roles:
+   - single-site: `administrator`, `editor`, and any additional role with equivalent authority (for example, `shop_manager`)
+   - Multisite: all `Super Admin` accounts plus any site-level admin roles that require elevated access
 
-3. Enroll all administrator accounts and store backup recovery codes in the approved password vault.
+3. Enroll all privileged accounts and store backup recovery codes in the approved password vault.
 
 4. Verify operational state:
 
 ```bash
 wp plugin is-active two-factor && echo "2FA plugin active"
 wp user list --role=administrator --fields=ID,user_login,user_email --format=table
+wp user list --role=editor --fields=ID,user_login,user_email --format=table
+
+# Multisite only
+wp super-admin list
 ```
 
 5. Document exceptions and break-glass approvals (owner, approver, expiry, and rollback steps).
@@ -698,14 +705,71 @@ wp user list --role=administrator --fields=ID,user_login,user_email --format=tab
 **Emergency Recovery (temporary):**
 
 ```bash
-# Use only during approved incident response
+# Preferred: recover the affected account without disabling the plugin globally.
+# Use action-gated reauthentication or equivalent identity re-verification first.
+
+# Last resort only during approved incident response:
 wp plugin deactivate two-factor
 
 # Re-enable immediately after account recovery
 wp plugin activate two-factor
 ```
 
-> **WARNING:** Any bypass window must be ticketed, time-bounded, and reviewed after closure.
+> **WARNING:** Any bypass window must be ticketed, time-bounded, approved by the incident owner, and reviewed after closure. When a global disable is unavoidable, apply compensating controls immediately and re-enroll affected users before closing the incident.
+
+#### Privileged Action Reauthentication (Sudo Mode)
+
+**Purpose:**
+Require action-gated reauthentication before sensitive or destructive operations even when the operator is already logged in. Managed platforms may call this *step-up authentication*; for example, WordPress VIP uses that term for higher-risk Dashboard actions.
+
+See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchmark) §5.5 and [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §8.2 for the corresponding policy rationale.
+
+**Prerequisites:**
+
+- 2FA is active for all privileged accounts
+- Approved reauthentication control selected (plugin, custom control, or managed-hosting equivalent)
+- Documented exception and break-glass owner
+
+**Commands:**
+
+```bash
+# Plugin-dependent - uncomment the approved reauthentication control in use:
+# wp plugin is-active fortress && echo "Fortress active"
+# wp plugin is-active wp-sudo && echo "wp-sudo active"
+
+# Multisite only - verify current Super Admin inventory before gating network-level actions
+wp super-admin list
+```
+
+Protected actions must include, at minimum:
+
+- installing, activating, or deleting plugins and themes
+- promoting users to privileged roles
+- creating or revoking application passwords
+- editing `wp-config.php` or equivalent critical configuration
+- performing core upgrades or downgrades
+- executing 2FA bypass or recovery steps
+- exporting or restoring production data
+
+**Expected Output:**
+
+- The approved control is active.
+- Sensitive actions trigger a fresh password and 2FA challenge before execution.
+
+**Rollback:**
+
+- If the control blocks emergency remediation, document the exception, apply the temporary bypass for the shortest practical window, complete the recovery action, and restore the gate before closing the incident.
+
+**Verification:**
+
+- Test at least one action from each category during staging or a quarterly drill.
+- Confirm the challenge applies to the Dashboard and relevant API surfaces where those actions are exposed.
+
+**Escalate If:**
+
+- The reauthentication control blocks all privileged access without a documented recovery path.
+- A sensitive action can still be completed without a fresh challenge.
+- Multisite network actions are not covered for `Super Admin` accounts.
 
 ### 5.6 File Integrity Monitoring (FIM)
 
@@ -800,7 +864,9 @@ See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 
 2. **Create Pre-Update Database Backup**
    ```bash
-   wp db export backup/pre-core-update-$(date +%Y%m%d-%H%M%S).sql
+   TS=$(date +%Y%m%d-%H%M%S)
+   wp db export /home/wordpress/backup/pre-core-update-${TS}.sql
+   gzip /home/wordpress/backup/pre-core-update-${TS}.sql
    ```
 
 3. **Update WordPress Core and Database Schema**
@@ -827,10 +893,10 @@ See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 
 ```bash
 # Restore the pre-update database backup
-wp db import backup/pre-core-update-YYYYMMDD-HHMMSS.sql
+gunzip < /home/wordpress/backup/pre-core-update-YYYYMMDD-HHMMSS.sql.gz | wp db import -
 
-# Revert application code to prior release if needed
-git checkout previous-release-tag
+# Restore a known-good core/files artifact if the update changed runtime-managed files
+tar -xzf /home/wordpress/backup/wordpress_TIMESTAMP.tar.gz -C /
 ```
 
 Use [Section 8.3](#rollback-procedure) for full rollback workflow.
@@ -849,7 +915,7 @@ tail -20 wp-content/debug.log
 curl -I https://[CUSTOMIZE: example.com]
 ```
 
-Then verify admin login and critical user flows in browser.
+Then verify Dashboard login and critical user flows in browser.
 
 **Escalate If:**
 
@@ -857,7 +923,7 @@ Then verify admin login and critical user flows in browser.
 - Fatal errors persist after cache flush and rollback.
 - Database upgrade (`wp core update-db`) fails.
 
-> **WARNING:** Minor updates (6.4.1 to 6.4.2) are generally safe. Major updates (6.3 to 6.4) should be tested on staging first.
+> **WARNING:** Minor updates are generally lower risk. Major updates should be tested on staging first and aligned with the current supported major release.
 
 ### 6.3 Plugin and Theme Updates
 
@@ -883,7 +949,9 @@ The [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 
 2. **Create Pre-Update Database Backup**
    ```bash
-   wp db export backup/pre-plugin-update-$(date +%Y%m%d-%H%M%S).sql
+   TS=$(date +%Y%m%d-%H%M%S)
+   wp db export /home/wordpress/backup/pre-plugin-update-${TS}.sql
+   gzip /home/wordpress/backup/pre-plugin-update-${TS}.sql
    ```
 
 3. **Update Plugins in Controlled Order**
@@ -934,10 +1002,10 @@ The [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 
 ```bash
 # Restore database if needed
-wp db import backup/pre-plugin-update-YYYYMMDD-HHMMSS.sql
+gunzip < /home/wordpress/backup/pre-plugin-update-YYYYMMDD-HHMMSS.sql.gz | wp db import -
 
-# Revert deployment to previous release when update introduces regressions
-git checkout previous-release-tag
+# Restore the known-good filesystem artifact for the affected plugin/theme set
+tar -xzf /home/wordpress/backup/wordpress_TIMESTAMP.tar.gz -C /
 ```
 
 Use [Section 8.3](#rollback-procedure) for full rollback steps.
@@ -1016,7 +1084,7 @@ wp transient delete --expired
 
 > **WARNING:** Major PHP version changes can break plugins/themes. Always test on staging first.
 
-> **NOTE:** Replace `8.2` below with your target PHP version (for example, `8.3`) and keep package names, FPM service, pool path, and socket references consistent.
+> **NOTE:** Replace `8.3` below with your target PHP version (for example, `8.4` after staging validation) and keep package names, FPM service, pool path, and socket references consistent.
 
 **Prerequisites:**
 - All plugins compatible with new PHP version (check WordPress.org)
@@ -1039,19 +1107,19 @@ wp transient delete --expired
    ```bash
    # Update PHP (example for Ubuntu/Debian)
    sudo apt-get update
-   sudo apt-get install -y php8.2 php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring
+   sudo apt-get install -y php8.3 php8.3-fpm php8.3-mysql php8.3-gd php8.3-xml php8.3-curl php8.3-mbstring
    
    # Switch to new PHP version
-   sudo update-alternatives --set php /usr/bin/php8.2
+   sudo update-alternatives --set php /usr/bin/php8.3
    ```
 
 3. **Update PHP-FPM Pool Configuration**
    ```bash
    # Edit pool configuration
-   sudo nano /etc/php/8.2/fpm/pool.d/www.conf
+   sudo nano /etc/php/8.3/fpm/pool.d/www.conf
    
    # Restart PHP-FPM
-   sudo systemctl restart php8.2-fpm
+   sudo systemctl restart php8.3-fpm
    ```
 
 4. **Test on Staging**
@@ -1060,7 +1128,7 @@ wp transient delete --expired
    curl -I https://[CUSTOMIZE: staging.example.com]
    
    # Check for PHP errors
-   tail -30 /var/log/php8.2-fpm.log
+   tail -30 /var/log/php8.3-fpm.log
    
    # Run automated tests
    npm run test
@@ -1070,21 +1138,21 @@ wp transient delete --expired
    ```nginx
    # In /etc/nginx/sites-available/default
    upstream php {
-       server unix:/run/php/php8.2-fpm.sock;  # Update version
+       server unix:/run/php/php8.3-fpm.sock;  # Update version
    }
    ```
 
 6. **Deploy to Production**
    ```bash
    # During maintenance window
-   sudo apt-get install -y php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring
+   sudo apt-get install -y php8.3-fpm php8.3-mysql php8.3-gd php8.3-xml php8.3-curl php8.3-mbstring
    
    # Update Nginx
    sudo nginx -t
    sudo systemctl reload nginx
    
    # Restart PHP-FPM
-   sudo systemctl restart php8.2-fpm
+   sudo systemctl restart php8.3-fpm
    
    # Verify
    curl -I https://[CUSTOMIZE: example.com]
@@ -1367,13 +1435,15 @@ Add to crontab:
 
 | Component | Frequency | Method | Retention | Storage |
 |-----------|-----------|--------|-----------|---------|
-| **Database** | Every 6 hours | `wp db export` + mysqldump | 90 days | [CUSTOMIZE: S3 / Backblaze / NAS] |
-| **WordPress Files** | Daily | rsync/tar | 30 days | [CUSTOMIZE: S3 / Backblaze / NAS] |
-| **Uploads Directory** | Daily | rsync | 30 days | [CUSTOMIZE: S3 / Backblaze / NAS] |
-| **Configuration Files** | Weekly | git + encrypted backup | 1 year | [CUSTOMIZE: Git repo + vault] |
-| **Full Site Snapshot** | Weekly | Volume snapshot | 8 weeks | [CUSTOMIZE: VM snapshot / AWS EBS] |
+| **Database** | Every 6 hours | `wp db export` (compressed) + optional physical backup | 90 days | Encrypted offsite object storage or equivalent |
+| **WordPress Files** | Daily | tar/rsync | 30 days | Encrypted offsite object storage |
+| **Uploads Directory** | Daily | tar/rsync | 30 days | Encrypted offsite object storage |
+| **Configuration Files** | Weekly | git + encrypted backup | 1 year | Git + secure vault |
+| **Full Site Snapshot** | Weekly | Volume or image snapshot | 90 days | Encrypted offsite snapshot service |
 
 > **WARNING:** Test all backups quarterly. A backup that has never been restored is not a backup.
+>
+> **WARNING:** Offsite backup storage must be encrypted and isolated from normal production-host access. Use write-only or tightly scoped credentials where possible so the production host can upload new backups without being able to browse or delete retained recovery points.
 
 ### 7.2 Automated Backup Script
 
@@ -1381,24 +1451,25 @@ Add to crontab:
 
 ```bash
 #!/bin/bash
-set -e
+set -euo pipefail
 
+WP_ROOT="/home/wordpress/public_html"
 BACKUP_DIR="/home/wordpress/backup"
-SITE_URL="[CUSTOMIZE: example.com]"
-DB_NAME="[CUSTOMIZE: wordpress]"
-DB_USER="[CUSTOMIZE: wp_user]"
+SITE_SLUG="[CUSTOMIZE: example.com]"
+REMOTE_URI="s3://[CUSTOMIZE: backup-bucket]/${SITE_SLUG}/"
 RETENTION_DAYS=90
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="/var/log/wordpress-backup.log"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
+cd "$WP_ROOT"
 
 echo "[$(date)] Starting WordPress backup..." >> "$LOG_FILE"
 
 # 1. Database backup
 echo "[$(date)] Backing up database..." >> "$LOG_FILE"
-wp db export "$BACKUP_DIR/db_${TIMESTAMP}.sql" --single-transaction >> "$LOG_FILE" 2>&1
+wp --path="$WP_ROOT" db export "$BACKUP_DIR/db_${TIMESTAMP}.sql" --single-transaction >> "$LOG_FILE" 2>&1
 gzip "$BACKUP_DIR/db_${TIMESTAMP}.sql"
 
 # 2. WordPress files backup (excluding uploads and cache)
@@ -1414,9 +1485,12 @@ tar -czf "$BACKUP_DIR/uploads_${TIMESTAMP}.tar.gz" \
     /home/wordpress/public_html/wp-content/uploads >> "$LOG_FILE" 2>&1
 
 # 4. Upload to remote storage (example using AWS S3)
+# Bucket policy and credentials should enforce encryption and prevent routine
+# browse/delete access from the production host.
 echo "[$(date)] Uploading to S3..." >> "$LOG_FILE"
-aws s3 sync "$BACKUP_DIR" "s3://[CUSTOMIZE: backup-bucket]/${SITE_URL}/" \
-    --exclude="*" --include="*_${TIMESTAMP}.tar.gz" --include="*_${TIMESTAMP}.sql.gz" >> "$LOG_FILE" 2>&1
+aws s3 cp "$BACKUP_DIR/db_${TIMESTAMP}.sql.gz" "$REMOTE_URI" >> "$LOG_FILE" 2>&1
+aws s3 cp "$BACKUP_DIR/wordpress_${TIMESTAMP}.tar.gz" "$REMOTE_URI" >> "$LOG_FILE" 2>&1
+aws s3 cp "$BACKUP_DIR/uploads_${TIMESTAMP}.tar.gz" "$REMOTE_URI" >> "$LOG_FILE" 2>&1
 
 # 5. Cleanup old local backups
 echo "[$(date)] Cleaning up old backups..." >> "$LOG_FILE"
@@ -1531,6 +1605,7 @@ See Section 4.2 for complete deployment workflow.
 - Approved release/tag exists
 - Deployment window approved
 - Database backup and rollback path confirmed
+- Known-good filesystem artifact or release package available for rollback
 
 **Commands:**
 
@@ -1541,15 +1616,17 @@ git fetch origin
 git checkout release/version-X.Y.Z
 composer install --no-dev
 
-# Run WordPress updates
-wp plugin update --all
-wp theme update --all
+# Apply schema updates only if the approved release requires them
 wp core update-db
 
-# Verify and test
+# Verify release state without mutating plugin/theme versions at deploy time
+wp plugin list --format=table --fields=name,status,version
+wp theme list --format=table --fields=name,status,version
 wp core is-installed && echo "OK"
 curl -I https://[CUSTOMIZE: example.com]
 ```
+
+> **WARNING:** Do not run `wp plugin update --all` or `wp theme update --all` during deployment. Patch plugins and themes through the dedicated update workflow so rollback remains tied to known-good artifacts.
 
 **Expected Output:**
 
@@ -1559,11 +1636,11 @@ curl -I https://[CUSTOMIZE: example.com]
 
 **Rollback:**
 
-Use [Section 8.3](#rollback-procedure) if post-deploy verification fails.
+Use [Section 8.3](#rollback-procedure) if post-deploy verification fails. Rollback depends on a known-good release artifact or filesystem backup, not on live WordPress.org update state.
 
 **Verification:**
 
-- Homepage and `/wp-admin/` return expected HTTP status.
+- Homepage and the Dashboard login return expected HTTP status.
 - Core workflows function (login, content read/write, critical integrations).
 
 **Escalate If:**
@@ -1592,17 +1669,17 @@ Migrate WordPress database safely between environments while preserving integrit
 1. **Export Database from Source**
    ```bash
    # From old server
-   wp db export backup/migration-source-$(date +%Y%m%d).sql --single-transaction
+   wp db export /home/wordpress/backup/migration-source-$(date +%Y%m%d).sql --single-transaction
 
    # Or using mysqldump
    mysqldump -u [CUSTOMIZE: user] -p --single-transaction --quick \
-     [CUSTOMIZE: database_name] > backup/migration-source-$(date +%Y%m%d).sql
+     [CUSTOMIZE: database_name] > /home/wordpress/backup/migration-source-$(date +%Y%m%d).sql
    ```
 
 2. **Transfer Database**
    ```bash
    # Secure copy to new server
-   scp backup/migration-source-*.sql [CUSTOMIZE: user@new-server]:/tmp/
+   scp /home/wordpress/backup/migration-source-*.sql [CUSTOMIZE: user@new-server]:/tmp/
    ```
 
 3. **Prepare New Database**
@@ -1628,7 +1705,7 @@ Migrate WordPress database safely between environments while preserving integrit
    # WARNING: This modifies all URL references across all database tables.
    wp search-replace "https://old.example.com" "https://new.example.com" --all-tables
 
-   # WARNING: Incorrect URLs here will make the site inaccessible via wp-admin.
+   # WARNING: Incorrect URLs here will make the site inaccessible via the Dashboard.
    wp option update home "https://[CUSTOMIZE: new.example.com]"
    wp option update siteurl "https://[CUSTOMIZE: new.example.com]"
    ```
@@ -1663,7 +1740,7 @@ Migrate WordPress database safely between environments while preserving integrit
 
 ```bash
 # Restore source backup onto target if migration validation fails
-wp db import backup/migration-source-YYYYMMDD.sql
+wp db import /home/wordpress/backup/migration-source-YYYYMMDD.sql
 ```
 
 Use [Section 8.3](#rollback-procedure) if deployment-level rollback is required.
@@ -1708,22 +1785,22 @@ Restore service quickly after a failed deployment and preserve evidence for root
 
 2. **Revert Code to Previous Release**
    ```bash
-   # If using git
+   # If using git and the release artifact itself is still intact
    git checkout previous-release-tag
    # OR
    git revert HEAD --no-edit  # Revert last commit
 
-   # OR manually restore from backup
+   # OR restore the known-good filesystem artifact
    tar -xzf /home/wordpress/backup/wordpress_TIMESTAMP.tar.gz -C /
    ```
 
 3. **Revert Database if Needed**
    ```bash
    # Restore from pre-deployment backup
-   wp db import backup/pre-deploy-TIMESTAMP.sql
+   gunzip < /home/wordpress/backup/pre-deploy-TIMESTAMP.sql.gz | wp db import -
 
    # Note: There is no transactional rollback for wp db import.
-   # To revert, restore from the pre-migration backup above.
+   # Rollback depends on a verified pre-deployment backup or filesystem artifact.
    ```
 
 4. **Verify Rollback**
@@ -1738,8 +1815,9 @@ Restore service quickly after a failed deployment and preserve evidence for root
    # Review error logs
    tail -100 /var/log/php-errors.log
 
-   # Check plugin compatibility
+   # Check component state
    wp plugin list --status=inactive --format=table
+   wp theme list --status=active --format=table
 
    # Review recent changes
    git diff [old-version]...[new-version] | head -100
@@ -1757,7 +1835,7 @@ If first rollback attempt fails, proceed to full restore in [Section 11.2](#full
 
 **Verification:**
 
-- Confirm homepage and `/wp-admin/` load.
+- Confirm homepage and the Dashboard login load.
 - Validate critical business workflows.
 - Confirm log noise/fatal errors drop to normal levels.
 
@@ -1922,7 +2000,7 @@ wp rewrite structure '/%year%/%monthnum%/%postname%/'
 wp rewrite flush
 
 # For 301 redirects from old URLs, configure at the web server level
-# or use a redirect plugin's admin interface (e.g., Redirection plugin)
+# or use a redirect plugin's Dashboard screen (e.g., Redirection plugin)
 ```
 
 > **WARNING:** Changing permalink structure requires 301 redirects from old URLs. Update internal links and notify users.
@@ -2017,7 +2095,7 @@ Lifecycle metadata for incident response procedures is tracked in Appendix E.
 **Use this playbook when:** uptime monitor fires a 5xx alert, or users report the site is unreachable.
 
 **Alert Meaning:**
-`500/502/503` on the public site or admin endpoint indicates the WordPress stack is degraded or unavailable (application, PHP-FPM, database, or host-level failure).
+`500/502/503` on the public site or `/wp-admin/` indicates the WordPress stack is degraded or unavailable (application, PHP-FPM, database, or host-level failure).
 
 **Customer Impact:**
 Users may be unable to read content, authenticate, publish, or complete transactions. Treat as P1/P2 depending on scope and duration.
@@ -2107,7 +2185,7 @@ tail -20 /var/log/nginx/error.log
 tail -20 /var/log/php-errors.log
 ```
 
-Confirm admin login and at least one critical business workflow (e.g., [CUSTOMIZE: test checkout, form submission, or user registration]) before closing incident.
+Confirm Dashboard login and at least one critical business workflow (e.g., [CUSTOMIZE: test checkout, form submission, or user registration]) before closing incident.
 
 ### 10.3 Security Breach Response {#security-breach-response}
 
@@ -2168,7 +2246,7 @@ Escalation: [Your contact details]
    ```
 4. **Perform security scans**
    ```bash
-   # Wordfence scans must be initiated through wp-admin > Wordfence > Scan
+  # Wordfence scans must be initiated through the Dashboard at Wordfence > Scan
    # For CLI-based malware scanning, use dedicated tools:
    clamscan -r [CUSTOMIZE: /home/wordpress/public_html]/
    aide --check > /tmp/aide-report.txt
@@ -2197,12 +2275,16 @@ Escalation: [Your contact details]
 
    # Invalidate all existing sessions (built-in WP-CLI command, no plugin required)
    wp user list --field=ID | xargs -I {} wp user session destroy {} --all
+
+   # Review and revoke application passwords for affected privileged users
+   wp user application-password list [USER_ID] --fields=uuid,name,created,last_used --format=table
+   wp user application-password delete [USER_ID] [UUID]
    ```
 4. Patch vulnerable components.
    ```bash
    wp core update
-   wp plugin update --all
-   wp theme update --all
+   wp plugin update [AFFECTED_PLUGIN_SLUG]
+   wp theme update [AFFECTED_THEME_SLUG]
    ```
 
 **Escalation:**
@@ -2445,9 +2527,11 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
 **Prerequisites:**
 - Backup verified and accessible
-- New server ready (or old server reformatted)
+- New server ready (or current server isolated for recovery)
 - Database backup in hand
 - WordPress file backup in hand
+- Change owner assigned
+- If using managed hosting or managed database services, provider restore workflow or support path identified
 
 **Steps:**
 
@@ -2455,11 +2539,18 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    ```bash
    # If using new server, ensure LEMP stack is installed
    # See Section 3.1 for architecture overview
-   
-   # If reusing old server, clean it
-   sudo rm -rf /home/wordpress/public_html/*
-   sudo rm -rf /var/lib/mysql/[CUSTOMIZE: wordpress_db]/*
+
+   # If reusing the current server, stop services first and move the old web
+   # root aside instead of deleting raw database files.
+   sudo systemctl stop nginx
+   sudo systemctl stop [CUSTOMIZE: php_fpm_service]
+   sudo systemctl stop mysql
+
+   sudo mv /home/wordpress/public_html /home/wordpress/public_html.pre-restore.$(date +%Y%m%d-%H%M%S)
+   sudo mkdir -p /home/wordpress/public_html
    ```
+
+   > **WARNING:** Do not delete the raw MySQL datadir with `rm -rf`. Recreate the database through MySQL or use the managed service's restore controls instead.
 
 2. **Restore WordPress Files**
    ```bash
@@ -2467,7 +2558,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    tar -xzf /home/wordpress/backup/wordpress_TIMESTAMP.tar.gz -C /
    
    # Option 2: From S3
-   aws s3 cp s3://[CUSTOMIZE: backup-bucket]/wordpress_TIMESTAMP.tar.gz - | tar -xz -C /
+   aws s3 cp s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/wordpress_TIMESTAMP.tar.gz - | tar -xz -C /
    
    # Verify files exist
    ls -la /home/wordpress/public_html/wp-config.php
@@ -2477,7 +2568,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    ```bash
    # Create database if not exists
    mysql -u root -p <<EOF
-   CREATE DATABASE [CUSTOMIZE: wordpress_db];
+   CREATE DATABASE IF NOT EXISTS [CUSTOMIZE: wordpress_db];
    CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: wordpress_db].* TO '[CUSTOMIZE: wp_user]'@'localhost';
    FLUSH PRIVILEGES;
@@ -2485,10 +2576,10 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    
    # Restore from backup
    # Option 1: From local backup
-   wp db import /home/wordpress/backup/db_TIMESTAMP.sql
+   gunzip < /home/wordpress/backup/db_TIMESTAMP.sql.gz | wp db import -
    
    # Option 2: From S3
-   aws s3 cp s3://[CUSTOMIZE: backup-bucket]/db_TIMESTAMP.sql.gz - | gunzip | wp db import -
+   aws s3 cp s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/db_TIMESTAMP.sql.gz - | gunzip | wp db import -
    ```
 
 4. **Restore Permissions**
@@ -2531,7 +2622,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
 7. **Update URLs** (if hostname changed)
    ```bash
-   # WARNING: Incorrect URLs here will make the site inaccessible via wp-admin.
+   # WARNING: Incorrect URLs here will make the site inaccessible via the Dashboard.
    wp option update home "https://[CUSTOMIZE: example.com]"
    wp option update siteurl "https://[CUSTOMIZE: example.com]"
 
@@ -2548,16 +2639,18 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    # wp redis flush-db
 
    # Restart services
-   sudo systemctl restart nginx
+   sudo systemctl restart mysql
    sudo systemctl restart [CUSTOMIZE: php_fpm_service]
+   sudo systemctl restart nginx
    
    # Test site
    curl -I https://[CUSTOMIZE: example.com]
    ```
 
 9. **Post-Restore**
-   - Reset admin passwords
-   - Check all users can login
+   - Reset privileged account passwords
+   - Review and revoke application passwords for affected privileged users with `wp user application-password list` and `wp user application-password delete`
+   - Check all privileged users can log in
    - Verify media loads correctly
    - Test form submissions
    - Monitor error logs for 30 minutes
@@ -2580,7 +2673,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    ls -lh /home/wordpress/backup/db_*.sql.gz
    
    # Or from S3
-   aws s3 ls s3://[CUSTOMIZE: backup-bucket]/ | grep "db_"
+   aws s3 ls s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/ | grep "db_"
    ```
 
 2. **Backup Current Database** (in case needed for comparison)
@@ -2588,18 +2681,21 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    wp db export /tmp/current-db-$(date +%Y%m%d-%H%M%S).sql
    ```
 
-3. **Drop Current Database Tables**
+3. **Remove Only WordPress Tables**
    ```bash
-   # WARNING: This drops ALL database tables and destroys all site content. Ensure the backup in step 2 completed successfully.
-   wp db reset --yes
+   # WARNING: This drops all tables matching the current WordPress table prefix.
+   # Use only after confirming the target prefix and after the backup in step 2 completed successfully.
+   wp db clean --yes
 
-   # Or manually — WARNING: same effect as above, irreversible without backup.
+   # Shared-database alternative: review the prefix first and use a manual, prefix-scoped drop list.
    mysql -u root -p [CUSTOMIZE: wordpress_db] <<EOF
    DROP TABLE IF EXISTS [CUSTOMIZE: table_prefix]commentmeta;
    DROP TABLE IF EXISTS [CUSTOMIZE: table_prefix]comments;
    -- ... drop all tables
    EOF
    ```
+
+   > **WARNING:** Do not use `wp db reset --yes` on shared databases. It drops and recreates the entire database, not just WordPress tables.
 
 4. **Import Backup**
    ```bash
@@ -2716,7 +2812,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    # Monitor new server for 24-48 hours first
    
    # After verification period, backup old server data
-   tar -czf /backup/old-server-final-$(date +%Y%m%d).tar.gz /home/wordpress/
+   tar -czf /home/wordpress/backup/old-server-final-$(date +%Y%m%d).tar.gz /home/wordpress/
    
    # Then safely shut down
    sudo shutdown -h now
@@ -3078,7 +3174,7 @@ This section documents all updates to this runbook and corresponding infrastruct
 **Breaking Changes:**
 - Set `DISALLOW_FILE_EDIT = true` as baseline; `DISALLOW_FILE_MODS` moved to optional hardened profile
 - Changed default post revision limit to 5 (from unlimited)
-- Updated PHP minimum version requirement to 8.2+
+- Updated PHP minimum version requirement to 8.3+
 
 **Infrastructure Changes:**
 - Upgraded to MySQL 8.0 / MariaDB 10.6
@@ -3170,7 +3266,7 @@ View recent errors:          tail -30 /var/log/php-errors.log
 Check server status:         top -bn1 | head
 Disable all plugins:         wp plugin deactivate --all
 Clear all caches:            wp cache flush
-Restore from backup:         wp db import backup/db_TIMESTAMP.sql
+Restore from backup:         gunzip < /home/wordpress/backup/db_TIMESTAMP.sql.gz | wp db import -
 
 IMPORTANT PATHS:
 WordPress root:              /home/wordpress/public_html/
@@ -3223,12 +3319,18 @@ ESCALATION PATH:
 
 | Term | Definition |
 |------|-----------|
+| **2FA / MFA** | Two-factor / multi-factor authentication for privileged accounts |
+| **Action-gated reauthentication** | A fresh identity check before sensitive or destructive actions, also known as sudo mode or step-up authentication |
+| **Application password** | A revocable WordPress credential for REST API or XML-RPC access that is separate from the main login password |
+| **Dashboard** | The WordPress administrative UI, distinct from the `/wp-admin/` path when the UI rather than the URL is what matters |
 | **LAMP/LEMP** | Linux, Apache/Nginx, MySQL, PHP - server stack |
+| **Multisite** | A WordPress network with shared codebase and site-level admins plus network-level Super Admins |
 | **WP-CLI** | Command-line interface for WordPress management |
 | **wp-config.php** | WordPress configuration file containing database credentials and settings |
 | **Transient** | Temporary data stored in WordPress database or cache |
-| **Cron/WP-Cron** | Scheduled background tasks |
+| **cron** | The operating-system scheduler used to run recurring host-level tasks |
 | **Plugin** | Extension that adds functionality to WordPress |
+| **WP-Cron** | WordPress's traffic-triggered task scheduler, distinct from system cron |
 | **Theme** | Collection of templates and assets defining site appearance |
 | **RTO** | Recovery Time Objective - maximum acceptable downtime |
 | **RPO** | Recovery Point Objective - maximum acceptable data loss |
