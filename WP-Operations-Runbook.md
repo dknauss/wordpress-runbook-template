@@ -2,7 +2,7 @@
 title: "WordPress Operations Runbook"
 subtitle: "For [CUSTOMIZE: Domain/Instance/Environment]"
 author: "By [CUSTOMIZE]"
-date: "March 13, 2026"
+date: "March 15, 2026"
 version: "3.0"
 header-includes: |
   \usepackage{eso-pic}
