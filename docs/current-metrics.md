@@ -2,25 +2,25 @@
 
 This file is the single source of truth for architectural counts in the WordPress Operations Runbook. Check this file before writing any count in prose, and update it when adding or removing procedures, commands, or structural elements.
 
-Last verified: 2026-03-12
+Last verified: 2026-03-15
 
 ## Architectural Facts
 
 | Fact | Value | Verification command | Last changed |
 |---|---:|---|---|
-| Document lines | 3,279 | `wc -l WP-Operations-Runbook.md` | v3.0-post |
+| Document lines | 3,273 | `wc -l WP-Operations-Runbook.md` | 2026-03-15 |
 | Major sections | 11 | `grep -cE '^## Section' WP-Operations-Runbook.md` | v3.0 |
 | Appendices | 5 | `grep -cE '^## Appendix' WP-Operations-Runbook.md` | v3.0 |
-| WP-CLI commands (total) | 157 | `grep -cE '^\s*wp ' WP-Operations-Runbook.md` | v3.0-post |
-| Destructive WP-CLI commands | 54 | `grep -cE '^\s*wp (search-replace|db import|db reset|db query|post delete|comment delete|user delete|plugin delete|plugin deactivate|option update|option delete|rewrite flush|transient delete|cache flush|eval|eval-file)' WP-Operations-Runbook.md` | v3.0-post |
+| WP-CLI commands (total) | 152 | `grep -cE '^\s*wp ' WP-Operations-Runbook.md` | 2026-03-15 |
+| Destructive WP-CLI commands | 49 | `grep -cE '^\s*wp (search-replace|db import|db reset|db query|post delete|comment delete|user delete|plugin delete|plugin deactivate|option update|option delete|rewrite flush|transient delete|cache flush|eval|eval-file)' WP-Operations-Runbook.md` | 2026-03-15 |
 | Commented-out WP-CLI commands | 13 | `grep -cE '^\s*# wp ' WP-Operations-Runbook.md` | v3.0-post |
 | Inline WARNING comments (`# WARNING:`) | 16 | `grep -c '# WARNING:' WP-Operations-Runbook.md` | v3.0-post |
 | Blockquote WARNING callouts | 15 | `grep -c '> \*\*WARNING:\*\*' WP-Operations-Runbook.md` | v3.0 |
-| `[CUSTOMIZE: ...]` placeholders | 201 | `grep -c '\[CUSTOMIZE:' WP-Operations-Runbook.md` | v3.0 |
-| Plugin-dependent annotations | 7 | `grep -c '# Plugin-dependent' WP-Operations-Runbook.md` | v3.0 |
-| Code fences (total) | 164 | `grep -c '^\`\`\`' WP-Operations-Runbook.md` | v3.0 |
-| Opening fences (with language tag) | 77 | `grep -cE '^\`\`\`[a-z]' WP-Operations-Runbook.md` | v3.0 |
-| Bare closing fences | 87 | `grep -cE '^\`\`\`$' WP-Operations-Runbook.md` | v3.0 |
+| `[CUSTOMIZE: ...]` placeholders | 203 | `grep -c '\[CUSTOMIZE:' WP-Operations-Runbook.md` | 2026-03-15 |
+| Plugin-dependent annotations | 6 | `grep -c '# Plugin-dependent' WP-Operations-Runbook.md` | 2026-03-15 |
+| Code fences (total) | 166 | `grep -c '^\`\`\`' WP-Operations-Runbook.md` | 2026-03-15 |
+| Opening fences (with language tag) | 78 | `grep -cE '^\`\`\`[a-z]' WP-Operations-Runbook.md` | 2026-03-15 |
+| Bare closing fences | 88 | `grep -cE '^\`\`\`$' WP-Operations-Runbook.md` | 2026-03-15 |
 | Output formats | 4 | Markdown, DOCX, EPUB, PDF | v3.0 |
 
 ## Safety Ratios
@@ -29,8 +29,8 @@ These derived metrics help evaluate whether the document maintains adequate safe
 
 | Ratio | Current | Target | Notes |
 |---|---|---|---|
-| Inline warnings / destructive commands | 16 / 54 (30%) | 100% of high-risk commands | Not all destructive commands need inline warnings (e.g., `wp cache flush` in a "Clear Caches" step is low-risk). Focus on commands that destroy unrecoverable data. |
-| Opening fences / closing fences | 77 / 87 | Equal or explainable | Difference of 10 is expected: some code blocks open with bare ``` (no language tag). A mismatch that can't be explained indicates a corrupted fence. |
+| Inline warnings / destructive commands | 16 / 49 (33%) | 100% of high-risk commands | Not all destructive commands need inline warnings (e.g., `wp cache flush` in a "Clear Caches" step is low-risk). Focus on commands that destroy unrecoverable data. |
+| Opening fences / closing fences | 78 / 88 | Equal or explainable | Difference of 10 is expected: some code blocks open with bare ``` (no language tag). A mismatch that can't be explained indicates a corrupted fence. |
 
 ## Verification Procedure
 

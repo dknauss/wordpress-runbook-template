@@ -528,12 +528,9 @@ sudo systemctl restart sshd
 
 ### 5.2 WordPress Hardening
 
-**Remove Unnecessary Files:**
+**Remove Unnecessary Public Metadata Files:**
 
 ```bash
-# Remove installation files
-rm /home/wordpress/public_html/wp-admin/install.php
-
 # Remove readme files
 rm /home/wordpress/public_html/readme.html
 rm /home/wordpress/public_html/wp-admin/readme.html
@@ -541,6 +538,8 @@ rm /home/wordpress/public_html/wp-admin/readme.html
 # Remove license files
 rm /home/wordpress/public_html/license.txt
 ```
+
+Do not rely on manually deleting `wp-admin/install.php` as a hardening control. WordPress blocks installer reuse after setup, and core files may be restored during updates.
 
 **Disable File Editing:**
 
@@ -946,7 +945,7 @@ Use [Section 8.3](#rollback-procedure) for full rollback steps.
 **Verification:**
 
 - Validate login, checkout/forms, search, and caching behavior.
-- Confirm plugin/theme health in dashboard (no fatal notices or forced deactivations).
+- Confirm plugin/theme health in Dashboard (no fatal notices or forced deactivations).
 
 **Escalate If:**
 
@@ -1040,7 +1039,7 @@ wp transient delete --expired
    ```bash
    # Update PHP (example for Ubuntu/Debian)
    sudo apt-get update
-   sudo apt-get install -y php8.2 php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring php8.2-json
+   sudo apt-get install -y php8.2 php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring
    
    # Switch to new PHP version
    sudo update-alternatives --set php /usr/bin/php8.2
@@ -1078,7 +1077,7 @@ wp transient delete --expired
 6. **Deploy to Production**
    ```bash
    # During maintenance window
-   sudo apt-get install -y php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring php8.2-json
+   sudo apt-get install -y php8.2-fpm php8.2-mysql php8.2-gd php8.2-xml php8.2-curl php8.2-mbstring
    
    # Update Nginx
    sudo nginx -t
@@ -1183,35 +1182,25 @@ WordPress should send emails through an SMTP service, not PHP mail():
 ```bash
 # Install and activate
 wp plugin install wp-mail-smtp --activate
-
-# Configure SMTP via WP-CLI
-# Plugin-dependent — requires WP Mail SMTP or equivalent mail plugin
-wp option update mailer '{"mailer":"smtp"}'
-wp option update mailer_host '[CUSTOMIZE: smtp.sendgrid.net]'
-wp option update mailer_port '587'
-wp option update mailer_encryption 'tls'
-wp option update mailer_username '[CUSTOMIZE: apikey]'
-# Note: Password should be stored securely, not in option
 ```
 
-**Or Configure in wp-config.php:**
+Configure the plugin in the Dashboard or lock the settings with the plugin's documented constants. Do not attempt to update unsupported per-field SMTP options with generic `wp option update` commands.
+
+**Example Constant-Based Configuration for WP Mail SMTP:**
 
 ```php
-// Use Sendgrid or Postmark SMTP
-// Note: These constants are NOT consumed by WordPress core. They require
-// a mail plugin (e.g., WP Mail SMTP) or custom mu-plugin code that reads them.
-define('SMTP_HOST', '[CUSTOMIZE: smtp.sendgrid.net]');
-define('SMTP_PORT', 587);
-define('SMTP_USER', '[CUSTOMIZE: apikey]');
-define('SMTP_PASSWORD', '[CUSTOMIZE: sg.xxx...]');
-define('SMTP_FROM', 'noreply@[CUSTOMIZE: example.com]');
-
-// Hook to override WordPress mail function
-add_filter('wp_mail', 'use_smtp_mail');
-function use_smtp_mail($atts) {
-    // Implementation uses defined constants above
-    return $atts;
-}
+// WP Mail SMTP plugin constants
+define('WPMS_ON', true);
+define('WPMS_MAILER', 'smtp');
+define('WPMS_SMTP_HOST', '[CUSTOMIZE: smtp.sendgrid.net]');
+define('WPMS_SMTP_PORT', 587);
+define('WPMS_SSL', 'tls');
+define('WPMS_SMTP_AUTH', true);
+define('WPMS_SMTP_USER', '[CUSTOMIZE: apikey]');
+define('WPMS_SMTP_PASS', '[CUSTOMIZE: sg.xxx...]');
+define('WPMS_FROM_EMAIL', 'noreply@[CUSTOMIZE: example.com]');
+// Optional:
+// define('WPMS_FROM_NAME', '[CUSTOMIZE: Site Name]');
 ```
 
 **Test Email Delivery:**
@@ -1874,11 +1863,11 @@ wp post create --post_type=post --post_title='New Post' \
 
 # Schedule post for future publishing
 wp post create --post_type=post --post_title='Scheduled Post' \
-  --post_content='Content' --post_status=scheduled \
+  --post_content='Content' --post_status=future \
   --post_date='2026-02-20 09:00:00'
 
 # List scheduled posts
-wp post list --post_status=scheduled --format=table
+wp post list --post_status=future --format=table
 ```
 
 **Review Before Publishing:**
@@ -1915,7 +1904,7 @@ wp term create category "New Category" --description="Category description"
 wp term update category [TERM_ID] --name="Updated Name"
 
 # Delete category (reassign posts)
-wp term delete category [TERM_ID] --default=1  # Assign to 'Uncategorized'
+wp term delete category [TERM_ID]  # WordPress reassigns posts to the default category
 ```
 
 **Permalink Structure:**
@@ -1969,7 +1958,7 @@ wp post list --s="keyword" --post_type=post --format=table
 # wp elasticpress index --setup
 
 # Check for posts with no content (unfixed)
-wp db query "SELECT ID, post_title FROM wp_posts WHERE post_content = '' AND post_type = 'post';"
+wp db query "SELECT ID, post_title FROM $(wp db prefix)posts WHERE post_content = '' AND post_type = 'post';"
 ```
 
 **Search Engine Indexing:**
@@ -1994,8 +1983,8 @@ wp search-replace "old-text" "new-text" --dry-run  # Preview changes
 # WARNING: This permanently modifies matching content across all tables.
 wp search-replace "old-text" "new-text"
 
-# WARNING: This permanently modifies matching content in wp_posts.
-wp search-replace "old" "new" wp_posts
+# WARNING: This permanently modifies matching content in the posts table.
+wp search-replace "old" "new" "$(wp db prefix)posts"
 ```
 
 
@@ -2333,8 +2322,8 @@ Users experience slow page loads, failed submissions, and reduced admin producti
    wp cron event list
    ps aux | grep "wp cron"
    # Check autoloaded options size (values over 1MB indicate bloat)
-   wp db query "SELECT SUM(LENGTH(option_value)) AS autoload_bytes FROM wp_options WHERE autoload = 'yes';"
-   wp db query "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE autoload = 'yes' ORDER BY size DESC LIMIT 10;"
+   wp db query "SELECT SUM(LENGTH(option_value)) AS autoload_bytes FROM $(wp db prefix)options WHERE autoload = 'yes';"
+   wp db query "SELECT option_name, LENGTH(option_value) AS size FROM $(wp db prefix)options WHERE autoload = 'yes' ORDER BY size DESC LIMIT 10;"
    ```
 
 If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §7.2 for guidance on replacing it with a system cron job, and [Section 6.6](#wordpress-cron-wp-cron-management) for the operational procedure.
@@ -2606,8 +2595,8 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
    # Or manually — WARNING: same effect as above, irreversible without backup.
    mysql -u root -p [CUSTOMIZE: wordpress_db] <<EOF
-   DROP TABLE IF EXISTS wp_commentmeta;
-   DROP TABLE IF EXISTS wp_comments;
+   DROP TABLE IF EXISTS [CUSTOMIZE: table_prefix]commentmeta;
+   DROP TABLE IF EXISTS [CUSTOMIZE: table_prefix]comments;
    -- ... drop all tables
    EOF
    ```
@@ -2841,7 +2830,7 @@ define('DB_USER', '[CUSTOMIZE: wp_user]');
 define('DB_PASSWORD', '[CUSTOMIZE: SecurePassword123!]');
 define('DB_HOST', '[CUSTOMIZE: localhost]');
 define('DB_CHARSET', 'utf8mb4');
-define('DB_COLLATE', 'utf8mb4_unicode_ci');
+define('DB_COLLATE', '');
 
 // Optional: Non-standard port
 define('DB_HOST', '[CUSTOMIZE: localhost:3307]');
@@ -2896,7 +2885,7 @@ define('FORCE_SSL_ADMIN', true);
 ```php
 // Enable WordPress debugging (STAGING/DEV only, DISABLE in production)
 define('WP_DEBUG', false);  // Set to true only for development
-define('WP_DEBUG_LOG', true);  // Log errors to wp-content/debug.log
+define('WP_DEBUG_LOG', false);  // Set both WP_DEBUG and WP_DEBUG_LOG to true only during debugging
 define('WP_DEBUG_DISPLAY', false);  // Don't display errors on frontend
 
 // Script debugging
@@ -2925,11 +2914,16 @@ define('AUTOSAVE_INTERVAL', 300);  // 5 minutes
 // Trash retention (days)
 define('EMPTY_TRASH_DAYS', 30);  // Auto-delete trash after 30 days
 
-// Image quality
-define('JPEG_QUALITY', 82);  // Compressed JPEG quality (0-100)
+// Core updates
+define('WP_AUTO_UPDATE_CORE', 'minor');  // Retain minor core auto-updates (baseline behavior since WordPress 3.7)
+```
 
-// Periodic backups
-define('WP_AUTO_UPDATE_CORE', 'minor');  // Auto-update minor versions only (available since WordPress 5.6)
+To change JPEG compression quality, use the `jpeg_quality` filter in a must-use plugin:
+
+```php
+add_filter('jpeg_quality', static function (): int {
+    return 82;
+});
 ```
 
 ### B.6 WordPress Cron Constants
@@ -2987,7 +2981,7 @@ define('DB_USER', '[CUSTOMIZE: wp_user]');
 define('DB_PASSWORD', '[CUSTOMIZE: SecurePassword123!]');
 define('DB_HOST', 'localhost');
 define('DB_CHARSET', 'utf8mb4');
-define('DB_COLLATE', 'utf8mb4_unicode_ci');
+define('DB_COLLATE', '');
 
 // ============================================================
 // SECURITY KEYS AND SALTS
@@ -3005,7 +2999,7 @@ define('NONCE_SALT',       '[CUSTOMIZE: unique-key]');
 // ============================================================
 // DATABASE TABLE PREFIX
 // ============================================================
-$table_prefix = 'wp_';  // Default; non-default prefixes are optional obscurity control
+$table_prefix = '[CUSTOMIZE: wp_]';  // Default prefix; non-default prefixes are optional obscurity control
 
 // ============================================================
 // LANGUAGE AND LOCALE
