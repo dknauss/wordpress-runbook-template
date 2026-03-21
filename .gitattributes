@@ -1,0 +1,5 @@
+*.docx binary
+*.epub binary
+*.pdf binary
+
+/.github export-ignore

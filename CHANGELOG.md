@@ -4,6 +4,14 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+## 3.1.0 — 2026-03-21
+
+### Changed
+- Standardized license metadata on the canonical Creative Commons legal text and normalized in-repo references to `CC-BY-SA-4.0`.
+- Added explicit repository health files (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, `.gitattributes`) and linked them from the README so the repo no longer relies on inherited defaults for contributor guidance.
+- Added a shared `Project Health` section in the README and aligned contributor and AI-assisted editorial copy with the rest of the security-document series.
+- Bumped the canonical runbook frontmatter date/version to `March 21, 2026` / `3.1` for the synchronized minor release.
+
 ## 3.0.1 — 2026-03-15
 
 ### Changed
