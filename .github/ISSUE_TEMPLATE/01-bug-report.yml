@@ -1,0 +1,30 @@
+name: Bug report
+description: Report inaccurate procedures, broken artifacts, or workflow issues.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: input
+    id: area
+    attributes:
+      label: Affected area
+      description: Name the document section, generated artifact, or workflow involved.
+      placeholder: Section 8 deployment, release workflow, PDF output
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction details
+      description: Include environment details, commands, screenshots, or references.
