@@ -37,7 +37,7 @@ These derived metrics help evaluate whether the document maintains adequate safe
 Run all verification commands after any structural edit to the runbook:
 
 ```bash
-cd /Users/danknauss/Documents/GitHub/wordpress-runbook-template
+cd "$(git rev-parse --show-toplevel)"
 
 echo "=== Document size ==="
 wc -l WP-Operations-Runbook.md

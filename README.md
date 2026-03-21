@@ -45,7 +45,7 @@ All three documents contain identical content organized into 11 sections plus ap
 10. **Incident Response** — severity classification, site-down triage, security breach response, escalation paths, post-incident review, performance troubleshooting
 11. **Disaster Recovery** — RTO/RPO targets, full-site restore, database recovery, server migration
 
-**Appendices:** File permissions reference, `wp-config.php` key settings, change log
+**Appendices:** File permissions reference, `wp-config.php` key settings, change log, deprecated and invalid constants guardrail, procedure ownership and validation matrix
 
 An **Emergency Quick-Reference Card** at the front provides at-a-glance triage steps for common failure scenarios.
 

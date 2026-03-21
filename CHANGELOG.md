@@ -4,6 +4,8 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+## 3.0.1 — 2026-03-15
+
 ### Changed
 - Reworked backup, restore, rollback, and deployment procedures to remove unsafe raw-datadir deletion, normalize backup paths and artifact formats, require known-good filesystem artifacts for rollback, and keep live plugin/theme updates out of deployment workflows.
 - Expanded authentication guidance to cover privileged roles beyond single-site administrators, added a dedicated action-gated reauthentication / sudo-mode procedure, and clarified break-glass and application-password handling during recovery and incident response.
