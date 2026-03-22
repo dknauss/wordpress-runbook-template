@@ -20,6 +20,10 @@ variables:
   # TOC on its own page
   toc-own-page: true
 
+  # Running heads — keep a short title in page headers so the customizable
+  # subtitle does not wrap into the body text area.
+  header-left: "WordPress Operations Runbook"
+
   # Hyperlinks — navy blue
   colorlinks: true
   linkcolor: "NavyBlue"

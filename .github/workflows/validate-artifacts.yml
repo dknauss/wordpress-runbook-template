@@ -1,0 +1,27 @@
+name: Validate Artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/validate-artifacts.py'
+      - '.github/workflows/validate-artifacts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+
+      - name: Validate generated artifacts
+        run: python3 .github/scripts/validate-artifacts.py

@@ -4,6 +4,18 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+### Added
+- Added a `Series review` issue form so quarterly and pre-release cross-document alignment checks can be tracked explicitly.
+- Added a repo-local generated-artifact smoke validator and a dedicated `Validate Artifacts` workflow for PDF, EPUB, and DOCX outputs.
+- Added a Playwright-based PDF visual smoke test and dedicated workflow with committed baselines for critical page regions.
+
+### Changed
+- Refactored the document-generation pipeline into explicit build, validate, and publish jobs so generated artifacts are validated before the bot commit step runs.
+- Updated GitHub Action pins in the PDF visual validation workflow to Node 24-capable major versions to avoid runner deprecation warnings.
+- Set a short PDF running header title so the customizable subtitle no longer appears in page headers.
+- Hardened GitHub release automation and metrics validation by pinning action references to immutable commits.
+- Documented the maintainer edit, verification, artifact-generation, release, and cross-document review workflow for this repository and its companion document series.
+
 ## 3.1.0 — 2026-03-21
 
 ### Changed

@@ -1,0 +1,48 @@
+name: Series review
+description: Track a scheduled cross-document alignment review for the WordPress security document series.
+title: "[Series Review]: "
+labels: ["maintenance", "triage"]
+body:
+  - type: dropdown
+    id: cadence
+    attributes:
+      label: Review type
+      options:
+        - Quarterly review
+        - Pre-release review
+        - Ad hoc alignment review
+    validations:
+      required: true
+  - type: checkboxes
+    id: companion_repos
+    attributes:
+      label: Companion repositories reviewed
+      options:
+        - label: wp-security-benchmark
+        - label: wp-security-hardening-guide
+        - label: wordpress-runbook-template
+        - label: wp-security-style-guide
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope checked
+      description: Note the terminology, version references, workflows, or linked guidance reviewed in this pass.
+      placeholder: Glossary terms, WordPress and PHP version references, WP-CLI commands, security reporting language
+    validations:
+      required: true
+  - type: textarea
+    id: drift
+    attributes:
+      label: Drift or follow-up found
+      description: Summarize any mismatches and identify the repo that should receive the follow-up change.
+      placeholder: No drift found, or list the specific mismatch and the affected repository
+    validations:
+      required: true
+  - type: textarea
+    id: tracking
+    attributes:
+      label: Tracking links
+      description: Link any related issues or pull requests opened as a result of this review.
+      placeholder: https://github.com/dknauss/wp-security-hardening-guide/issues/123

@@ -12,9 +12,266 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: generate-docs-${{ github.repository }}
+  cancel-in-progress: true
+
 jobs:
-  generate-docs:
-    uses: dknauss/ai-assisted-docs/.github/workflows/reusable-generate-docs.yml@main
-    with:
-      primary_markdown: WP-Operations-Runbook.md
-    secrets: inherit
+  build-docs:
+    runs-on: ubuntu-latest
+    outputs:
+      md_file: ${{ steps.inputs.outputs.md_file }}
+      base: ${{ steps.inputs.outputs.base }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install Pandoc
+        run: |
+          PANDOC_VER=3.6.3
+          wget -q "https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb"
+          sudo dpkg -i "pandoc-${PANDOC_VER}-1-amd64.deb"
+          rm "pandoc-${PANDOC_VER}-1-amd64.deb"
+
+      - name: Install LaTeX, fonts, and validators
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            texlive-xetex \
+            texlive-latex-recommended \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
+            texlive-latex-extra \
+            lmodern \
+            fonts-noto-core \
+            fonts-noto-extra \
+            epubcheck \
+            poppler-utils \
+            unzip
+
+      - name: Install eisvogel template
+        run: |
+          mkdir -p ~/.pandoc/templates
+          TMPDIR_EIS=$(mktemp -d)
+          curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz" \
+            | tar -xz -C "$TMPDIR_EIS"
+          find "$TMPDIR_EIS" -name "*.latex" -exec cp {} ~/.pandoc/templates/ \;
+          rm -rf "$TMPDIR_EIS"
+
+      - name: Bootstrap pandoc styling assets
+        run: |
+          mkdir -p .github/pandoc
+
+          if [ ! -f .github/pandoc/reference.docx ]; then
+            pandoc --print-default-data-file reference.docx > .github/pandoc/reference.docx
+          fi
+
+          if [ ! -f .github/pandoc/pdf-defaults.yaml ]; then
+            {
+              printf '%s\n' '# Pandoc PDF defaults - eisvogel template, professional dark-header layout'
+              printf '%s\n' 'variables:'
+              printf '%s\n' '  mainfont: "Noto Serif"'
+              printf '%s\n' '  sansfont: "Noto Sans"'
+              printf '%s\n' '  monofont: "Noto Sans Mono"'
+              printf '%s\n' '  fontsize: "11pt"'
+              printf '%s\n' '  geometry: "margin=2.5cm, top=3cm, bottom=3cm"'
+              printf '%s\n' '  linestretch: 1.2'
+              printf '%s\n' '  titlepage: true'
+              printf '%s\n' '  titlepage-color: "1A1A2E"'
+              printf '%s\n' '  titlepage-text-color: "FFFFFF"'
+              printf '%s\n' '  titlepage-rule-color: "0073AA"'
+              printf '%s\n' '  titlepage-rule-height: 6'
+              printf '%s\n' '  toc-own-page: true'
+              printf '%s\n' '  colorlinks: true'
+              printf '%s\n' '  linkcolor: "NavyBlue"'
+              printf '%s\n' '  urlcolor: "NavyBlue"'
+              printf '%s\n' '  citecolor: "NavyBlue"'
+              printf '%s\n' '  table-use-row-colors: true'
+              printf '%s\n' '  listings-no-page-break: true'
+            } > .github/pandoc/pdf-defaults.yaml
+          fi
+
+          if [ ! -f .github/pandoc/epub.css ]; then
+            {
+              printf '%s\n' ':root { color-scheme: light; }'
+              printf '%s\n' 'body { max-width: 46em; margin: 0 auto; padding: 1.2em; background: #fcfcfb; color: #111827; font-family: "Noto Serif", Georgia, serif; line-height: 1.55; }'
+              printf '%s\n' 'h1, h2, h3, h4 { color: #0f172a; font-family: "Noto Sans", "Helvetica Neue", Arial, sans-serif; line-height: 1.2; }'
+              printf '%s\n' 'h1 { font-size: 1.9em; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.3em; }'
+              printf '%s\n' 'h2 { font-size: 1.45em; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25em; }'
+              printf '%s\n' 'a { color: #0b5fff; text-decoration: none; }'
+              printf '%s\n' 'a:hover, a:focus { text-decoration: underline; }'
+              printf '%s\n' 'code, pre { font-family: "Noto Sans Mono", "SFMono-Regular", Consolas, monospace; font-size: 0.92em; }'
+              printf '%s\n' 'pre { padding: 0.9em; overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 6px; background: #f3f4f6; }'
+              printf '%s\n' 'blockquote { margin: 1em 0; padding: 0.1em 1em; border-left: 4px solid #d1d5db; background: #f9fafb; color: #374151; }'
+              printf '%s\n' 'table { width: 100%; border-collapse: collapse; margin: 1.1em 0; font-size: 0.94em; }'
+              printf '%s\n' 'th, td { border: 1px solid #d1d5db; padding: 0.45em 0.6em; vertical-align: top; }'
+              printf '%s\n' 'th { background: #f3f4f6; font-family: "Noto Sans", "Helvetica Neue", Arial, sans-serif; }'
+              printf '%s\n' 'ul, ol { padding-left: 1.3em; }'
+              printf '%s\n' 'img { max-width: 100%; height: auto; }'
+            } > .github/pandoc/epub.css
+          fi
+
+      - name: Resolve build inputs
+        id: inputs
+        run: |
+          echo "md_file=WP-Operations-Runbook.md" >> "$GITHUB_OUTPUT"
+          echo "base=WP-Operations-Runbook" >> "$GITHUB_OUTPUT"
+
+      - name: Update date in frontmatter
+        run: |
+          md_file="${{ steps.inputs.outputs.md_file }}"
+          today=$(date '+%B %-d, %Y')
+          if head -1 "$md_file" | grep -q '^---$'; then
+            sed -i "s/^date: .*/date: \"$today\"/" "$md_file"
+          fi
+
+      - name: Convert primary document
+        run: |
+          md_file="${{ steps.inputs.outputs.md_file }}"
+          base="${{ steps.inputs.outputs.base }}"
+          docx_file="${base}.docx"
+
+          version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p }' "$md_file")
+          if [ -n "$version" ]; then
+            display_date="Version ${version} — $(date '+%B %-d, %Y')"
+          else
+            display_date="$(date '+%B %-d, %Y')"
+          fi
+
+          pandoc "$md_file" \
+            --reference-doc=".github/pandoc/reference.docx" \
+            --toc --toc-depth=3 \
+            -o "$docx_file"
+
+          pandoc "$docx_file" \
+            --from docx \
+            --template eisvogel \
+            --pdf-engine xelatex \
+            --defaults ".github/pandoc/pdf-defaults.yaml" \
+            --metadata "date=${display_date}" \
+            --toc --toc-depth=3 \
+            -o "${base}.pdf"
+
+          pandoc "$docx_file" \
+            --from docx \
+            --css ".github/pandoc/epub.css" \
+            --toc --toc-depth=3 \
+            --epub-title-page=false \
+            --metadata "lang=en-US" \
+            -o "${base}.epub"
+
+      - name: Upload generated document bundle
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: generated-docs-bundle
+          path: |
+            ${{ steps.inputs.outputs.md_file }}
+            ${{ steps.inputs.outputs.base }}.pdf
+            ${{ steps.inputs.outputs.base }}.docx
+            ${{ steps.inputs.outputs.base }}.epub
+            .github/pandoc/reference.docx
+            .github/pandoc/pdf-defaults.yaml
+            .github/pandoc/epub.css
+
+  validate-artifacts:
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Download generated document bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: generated-docs-bundle
+          path: .
+
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+
+      - name: Validate generated artifacts
+        run: python3 .github/scripts/validate-artifacts.py
+
+  validate-pdf-visual:
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Download generated document bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: generated-docs-bundle
+          path: .
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate PDF visuals
+        run: xvfb-run -a npm run validate:pdf-visual
+
+      - name: Upload visual diff artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: pdf-visual-diffs
+          path: output/playwright/pdf-visual
+          if-no-files-found: ignore
+
+  publish-generated-docs:
+    needs:
+      - validate-artifacts
+      - validate-pdf-visual
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Download generated document bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: generated-docs-bundle
+          path: .
+
+      - name: Commit generated documents
+        run: |
+          branch="${GITHUB_REF_NAME:-main}"
+
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add \
+            "WP-Operations-Runbook.md" \
+            "WP-Operations-Runbook.pdf" \
+            "WP-Operations-Runbook.docx" \
+            "WP-Operations-Runbook.epub" \
+            ".github/pandoc/reference.docx" \
+            ".github/pandoc/pdf-defaults.yaml" \
+            ".github/pandoc/epub.css" \
+            2>/dev/null || true
+
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: regenerate PDF, Word, and EPUB documents [skip ci]"
+            git pull --rebase origin "$branch"
+            git push
+          else
+            echo "No changes to commit"
+          fi
