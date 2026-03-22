@@ -22,6 +22,15 @@ CANONICAL_TOKENS = (
     "Verification",
     "[CUSTOMIZE:",
 )
+PARITY_PHRASES = (
+    FULL_TITLE,
+    "Conventions",
+    "Purpose",
+    "Verification",
+    "Dashboard",
+    "WP-CLI",
+    "[CUSTOMIZE:",
+)
 
 
 class ValidationError(Exception):
@@ -74,6 +83,7 @@ def validate_pdf(path: Path) -> None:
     text = extract_pdf_text(path)
     assert_contains(text, (FULL_TITLE, SHORT_TITLE, "Version 3.1", *CANONICAL_TOKENS), "PDF")
     print("OK   [PDF] canonical text markers found")
+    return text
 
 
 def extract_xml_text(xml_bytes: bytes) -> str:
@@ -104,6 +114,7 @@ def validate_docx(path: Path) -> None:
         assert_contains(document_text, ("Conventions", "Purpose", "Verification"), "DOCX")
 
     print("OK   [DOCX] structure, metadata, and canonical text markers found")
+    return document_text
 
 
 def validate_epub(path: Path) -> None:
@@ -134,14 +145,31 @@ def validate_epub(path: Path) -> None:
 
         epub_text = []
         for member in xhtml_members:
-          epub_text.append(extract_xml_text(archive.read(member)))
-        assert_contains(" ".join(epub_text), ("WordPress Operations Runbook", *CANONICAL_TOKENS), "EPUB")
+            epub_text.append(extract_xml_text(archive.read(member)))
+        joined_text = " ".join(epub_text)
+        assert_contains(joined_text, ("WordPress Operations Runbook", *CANONICAL_TOKENS), "EPUB")
 
     print("OK   [EPUB] structure, metadata, and canonical text markers found")
+    return joined_text
+
+
+def validate_markdown(path: Path) -> str:
+    ensure_exists(path, "Markdown")
+    text = path.read_text(encoding="utf-8")
+    assert_contains(text, ("WordPress Operations Runbook", "Conventions", "Dashboard", "WP-CLI", "[CUSTOMIZE:"), "Markdown")
+    print("OK   [Markdown] canonical text markers found")
+    return text
+
+
+def validate_cross_format_parity(texts: dict[str, str]) -> None:
+    for label, text in texts.items():
+        assert_contains(text, PARITY_PHRASES, label)
+    print(f"OK   [Parity] canonical phrases match across {len(texts)} formats")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--markdown", default="WP-Operations-Runbook.md", help="Markdown source path")
     parser.add_argument("--pdf", default="WP-Operations-Runbook.pdf", help="PDF artifact path")
     parser.add_argument("--epub", default="WP-Operations-Runbook.epub", help="EPUB artifact path")
     parser.add_argument("--docx", default="WP-Operations-Runbook.docx", help="DOCX artifact path")
@@ -150,20 +178,19 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    validators = (
-        (validate_pdf, Path(args.pdf)),
-        (validate_epub, Path(args.epub)),
-        (validate_docx, Path(args.docx)),
-    )
-
     try:
-        for validator, path in validators:
-            validator(path)
+        texts = {
+            "Markdown": validate_markdown(Path(args.markdown)),
+            "PDF": validate_pdf(Path(args.pdf)),
+            "EPUB": validate_epub(Path(args.epub)),
+            "DOCX": validate_docx(Path(args.docx)),
+        }
+        validate_cross_format_parity(texts)
     except ValidationError as exc:
         print(f"FAIL {exc}", file=sys.stderr)
         return 1
 
-    print("All artifact checks passed (3 formats).")
+    print("All artifact and parity checks passed (4 formats).")
     return 0
 
 

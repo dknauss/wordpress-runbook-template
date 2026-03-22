@@ -8,6 +8,7 @@ All notable changes to the WordPress Operations Runbook template.
 - Added a `Series review` issue form so quarterly and pre-release cross-document alignment checks can be tracked explicitly.
 - Added a repo-local generated-artifact smoke validator and a dedicated `Validate Artifacts` workflow for PDF, EPUB, and DOCX outputs.
 - Added a Playwright-based PDF visual smoke test and dedicated workflow with committed baselines for critical page regions.
+- Added a cross-format parity check so a small set of canonical phrases must remain present in the Markdown source and generated PDF, EPUB, and DOCX outputs.
 
 ### Changed
 - Corrected the example WordPress version placeholder to reflect WordPress 6.9.1 as the current stable release.
