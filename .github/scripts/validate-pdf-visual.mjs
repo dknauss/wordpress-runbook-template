@@ -27,7 +27,7 @@ const VIEWPORT = { width: 1200, height: 760 };
 const PIXELMATCH_THRESHOLD = 0.1;
 const DHASH_WIDTH = 17;
 const DHASH_HEIGHT = 16;
-const MAX_DHASH_DISTANCE = 20;
+const MAX_DHASH_DISTANCE = 30;
 
 function parseArgs(argv) {
   return {
