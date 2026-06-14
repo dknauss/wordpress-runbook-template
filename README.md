@@ -1,5 +1,5 @@
 # WordPress Operations Runbook Template
-[![License](https://img.shields.io/github/license/dknauss/wordpress-runbook-template)](LICENSE) [![CI](https://github.com/dknauss/wordpress-runbook-template/actions/workflows/generate-docs.yml/badge.svg)](https://github.com/dknauss/wordpress-runbook-template/actions/workflows/generate-docs.yml) [![Security Policy](https://img.shields.io/badge/security-policy-4c1)](SECURITY.md)
+[![License](https://img.shields.io/github/license/dknauss/wordpress-runbook-template)](LICENSE) [![CI](https://github.com/dknauss/wordpress-runbook-template/actions/workflows/generate-docs.yml/badge.svg)](https://github.com/dknauss/wordpress-runbook-template/actions/workflows/generate-docs.yml) [![Security Policy](https://img.shields.io/badge/security-policy-4c1)](SECURITY.md) [![AI Authorship](https://img.shields.io/badge/AI%20authorship-disclosed-8a63d2.svg)](docs/ai-authorship.md)
 
 
 A comprehensive operations runbook template for WordPress sites running on standard LEMP (Nginx) or LAMP (Apache) stacks. This template provides the structure and procedures for creating a site-specific runbook tailored to your environment — fill in your configuration details, remove sections that don't apply, rename/replace [TEMPLATE/CUSTOMIZE] references, and you have a complete operational reference for your team. 
