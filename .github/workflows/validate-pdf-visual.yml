@@ -1,10 +1,21 @@
 name: Validate PDF Visuals
 
 on:
+  pull_request:
+    paths:
+      - '.github/pandoc/**'
+      - '.github/scripts/validate-pdf-visual.mjs'
+      - '.github/workflows/generate-docs.yml'
+      - '.github/workflows/validate-pdf-visual.yml'
+      - '.github/test-artifacts/pdf-baselines/**'
+      - 'package.json'
+      - 'package-lock.json'
   push:
     branches: [main]
     paths:
+      - '.github/pandoc/**'
       - '.github/scripts/validate-pdf-visual.mjs'
+      - '.github/workflows/generate-docs.yml'
       - '.github/workflows/validate-pdf-visual.yml'
       - '.github/test-artifacts/pdf-baselines/**'
       - 'package.json'

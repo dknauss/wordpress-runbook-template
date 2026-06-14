@@ -196,48 +196,9 @@ jobs:
       - name: Validate generated artifacts
         run: python3 .github/scripts/validate-artifacts.py
 
-  validate-pdf-visual:
-    needs: build-docs
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-
-      - name: Download generated document bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: generated-docs-bundle
-          path: .
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Validate PDF visuals
-        run: xvfb-run -a npm run validate:pdf-visual
-
-      - name: Upload visual diff artifacts
-        if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: pdf-visual-diffs
-          path: output/playwright/pdf-visual
-          if-no-files-found: ignore
 
   publish-generated-docs:
-    needs:
-      - validate-artifacts
-      - validate-pdf-visual
+    needs: validate-artifacts
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
