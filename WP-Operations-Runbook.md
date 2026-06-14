@@ -348,12 +348,13 @@ wordpress-repo/
    # Install/update dependencies
    composer install --no-dev
 
-   # Do not introduce live plugin/theme version drift during deployment.
-   # Patch plugins/themes through the dedicated update workflow instead.
-   
-   # Run database migrations if needed
-   wp db query < migrations/pending-migration.sql
-   ```
+  # Do not introduce live plugin/theme version drift during deployment.
+  # Patch plugins/themes through the dedicated update workflow instead.
+  
+  # Run database migrations if needed
+  # WARNING: This applies pending schema/data changes to the staging database. Confirm the migration file targets staging before running it.
+  wp db query < migrations/pending-migration.sql
+  ```
 
 3. **Test on Staging**
    - Verify site loads: `curl -I https://[CUSTOMIZE: staging.example.com]`
@@ -459,8 +460,9 @@ wordpress-repo/
 
 6. **Clear Caches**
    ```bash
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Run only after content or config changes are complete.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
    ```
@@ -709,6 +711,7 @@ wp super-admin list
 # Use action-gated reauthentication or equivalent identity re-verification first.
 
 # Last resort only during approved incident response:
+# WARNING: This temporarily removes a privileged-account safeguard for every affected user. Use only during an approved, time-bounded recovery window.
 wp plugin deactivate two-factor
 
 # Re-enable immediately after account recovery
@@ -877,8 +880,9 @@ See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 
 4. **Flush Runtime Caches**
    ```bash
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Use after the update only when validation is ready.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
    ```
@@ -986,6 +990,7 @@ The [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
    wp db check
 
    # Clear caches
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Use after the update only when validation is ready.
    wp cache flush
 
    # Test critical pages
@@ -1075,6 +1080,7 @@ wp comment delete $(wp comment list --status=spam --format=ids) --force
 
 ```bash
 # Delete expired transients
+# WARNING: This permanently removes expired transients. Confirm no plugin in your stack incorrectly relies on expired values lingering for manual inspection.
 wp transient delete --expired
 ```
 
@@ -1275,6 +1281,7 @@ define('WPMS_FROM_EMAIL', 'noreply@[CUSTOMIZE: example.com]');
 
 ```bash
 # Send test email
+# WARNING: This executes PHP inside the live WordPress context and sends a real message. Use a safe recipient and approved test window.
 wp eval-file - <<'PHP'
 wp_mail('[CUSTOMIZE: admin@example.com]', 'WordPress Email Test', 'This is a test email from WordPress.');
 PHP
@@ -1555,6 +1562,7 @@ sudo chown root:root /usr/local/bin/wordpress-backup.sh
    zcat /home/wordpress/backup/db_TIMESTAMP.sql.gz > /tmp/test-restore.sql
    
    # Import to test database
+   # WARNING: This overwrites the target test database contents. Confirm the destination is disposable staging or an isolated restore target.
    wp db import /tmp/test-restore.sql --allow-root
    
    # Verify tables
@@ -1694,6 +1702,7 @@ Migrate WordPress database safely between environments while preserving integrit
 4. **Import Database**
    ```bash
    # On new server
+   # WARNING: This overwrites the target database contents. Confirm the destination database, credentials, and backup provenance before continuing.
    wp db import /tmp/migration-source-*.sql
 
    # Or using mysql command
@@ -1724,8 +1733,9 @@ Migrate WordPress database safely between environments while preserving integrit
 
 7. **Clear Caches**
    ```bash
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Run only after migration validation is complete.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
    ```
@@ -1740,6 +1750,7 @@ Migrate WordPress database safely between environments while preserving integrit
 
 ```bash
 # Restore source backup onto target if migration validation fails
+# WARNING: This overwrites the target database with the backup named here. Confirm you are restoring the intended snapshot.
 wp db import /home/wordpress/backup/migration-source-YYYYMMDD.sql
 ```
 
@@ -1916,6 +1927,7 @@ wp media regenerate --yes  # Regenerate thumbnails
 wp plugin install wordpress-unlimited-amazon-s3-media-library --activate
 
 # Configure S3 bucket
+# WARNING: This rewrites plugin settings in the live database. Validate the bucket, region, and plugin-specific key names before saving.
 wp option update as3cf_settings '{
   "bucket": "[CUSTOMIZE: my-bucket]",
   "region": "[CUSTOMIZE: us-east-1]"
@@ -2046,6 +2058,7 @@ wp db query "SELECT ID, post_title FROM $(wp db prefix)posts WHERE post_content 
 wp option get blog_public
 
 # Enable search engine visibility
+# WARNING: This changes live indexing behavior. Confirm the site is ready for public indexing before enabling it.
 wp option update blog_public 1
 
 # Verify core sitemaps are accessible (WordPress 5.5+)
@@ -2267,14 +2280,14 @@ Escalation: [Your contact details]
    ```
 3. Reset privileged credentials and terminate active sessions.
    ```bash
-   wp user list --role=administrator --field=user_login | while read user; do
+   wp user list --role=administrator --fields=user_login --format=csv | tail -n +2 | while read user; do
      NEW_PASS=$(openssl rand -base64 16)
      wp user update "$user" --user_pass="$NEW_PASS"
      echo "Reset $user — communicate new password via secure channel"
    done
 
    # Invalidate all existing sessions (built-in WP-CLI command, no plugin required)
-   wp user list --field=ID | xargs -I {} wp user session destroy {} --all
+   wp user list --fields=ID --format=csv | tail -n +2 | xargs -I {} wp user session destroy {} --all
 
    # Review and revoke application passwords for affected privileged users
    wp user application-password list [USER_ID] --fields=uuid,name,created,last_used --format=table
@@ -2414,14 +2427,16 @@ If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guid
 
 1. Reduce immediate load and clear caches.
    ```bash
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Use only after capturing evidence and confirming it will not mask the symptom.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
    ```
 2. Run safe database hygiene steps.
    ```bash
    wp db optimize
+   # WARNING: This permanently removes expired transients. Confirm no plugin in your stack incorrectly relies on expired values lingering for manual inspection.
    wp transient delete --expired
    ```
 3. If a plugin is identified as the bottleneck, disable it and validate service response.
@@ -2633,8 +2648,9 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 8. **Restore Services**
    ```bash
    # Clear caches
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Use after restore validation is ready.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
 
@@ -2703,6 +2719,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    gunzip < /home/wordpress/backup/db_TIMESTAMP.sql.gz | wp db import -
    
    # Or if backup is already uncompressed
+   # WARNING: This overwrites the current database with the specified backup snapshot. Confirm backup identity and rollback owner before continuing.
    wp db import /home/wordpress/backup/db_TIMESTAMP.sql
    ```
 
@@ -2721,11 +2738,13 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 6. **Update and Clear Caches**
    ```bash
    # If recovered to different time, update site metadata
+   # WARNING: This changes core update-check metadata in the live database. Use only as part of a controlled post-recovery reset.
    wp option update last_update_check '0'
    
    # Clear all caches
+   # WARNING: Cache flushes can briefly increase origin load and expose stale/missed warmup paths. Use after recovery verification is ready.
    wp cache flush
-   # Plugin-dependent — uncomment the cache plugin(s) in use:
+   # Plugin-dependent - uncomment the cache plugin(s) in use:
    # wp w3-total-cache flush all
    # wp redis flush-db
    ```

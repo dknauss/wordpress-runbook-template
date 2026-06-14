@@ -12,6 +12,7 @@ All notable changes to the WordPress Operations Runbook template.
 
 ### Changed
 - Separated Playwright PDF visual validation from the artifact publish path so `generate-docs.yml` can publish after artifact checks while the dedicated visual workflow handles layout regression checks on workflow, packaging, and Pandoc changes.
+- Aligned more of the operational procedures with the current runbook-skill safety rules by normalizing the cache-plugin annotation string, correcting the remaining singular `--field` WP-CLI examples to explicit `--fields=... --format=csv` pipelines, and adding approval/warning markers around additional side-effect commands (`wp db query` migrations, cache flushes, imports, option updates, transient deletion, and `wp eval-file` test mail).
 - Corrected the example WordPress version placeholder to reflect the WordPress 7.0 release state.
 - Refactored the document-generation pipeline into explicit build, validate, and publish jobs so generated artifacts are validated before the bot commit step runs.
 - Updated GitHub Action pins in the PDF visual validation workflow to Node 24-capable major versions to avoid runner deprecation warnings.
