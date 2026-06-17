@@ -61,6 +61,8 @@ An **Emergency Quick-Reference Card** at the front provides at-a-glance triage s
 
 4. **Assign ownership and schedule reviews.** Designate a runbook owner responsible for keeping the document current. Update the Change Log (Appendix C) whenever the environment changes, and schedule quarterly reviews to ensure the runbook reflects the actual state of the site.
 
+If your team will adapt the runbook into customer-facing incident updates, internal guidance, or other WordPress communications, take [Learn WordPress — Writing in the WordPress voice](https://learn.wordpress.org/course/writing-in-the-wordpress-voice/) and use the [WordPress Security Style Guide](https://github.com/dknauss/wp-security-style-guide) for terminology and tone.
+
 ## Design Principles
 
 This template follows industry runbook conventions from Atlassian, Google SRE, and PagerDuty:
@@ -100,7 +102,7 @@ This runbook is one of four complementary documents covering WordPress security 
 
 ## AI-Assisted Editorial Process
 
-This document and the three related documents in this series are revised with the assistance of frontier LLMs. Multiple models independently review all four documents for factual errors, outdated guidance, and cross-document misalignments, with the WordPress Advanced Administration Handbook as primary authority. A human editor reviews, approves, or rejects every recommended change before it is applied. For the full methodology, see **[AI-Assisted Documentation Processes](https://github.com/dknauss/ai-assisted-docs)**. The machine-readable editorial agent skills and cross-document consistency rules are in the [skills directory](https://github.com/dknauss/ai-assisted-docs/tree/main/wp-docs-skills).
+This document and the three related documents in this series are revised with the assistance of frontier LLMs. Multiple models independently review all four documents for factual errors, outdated guidance, and cross-document misalignments, using WordPress technical documentation as primary authority for product facts and the Learn WordPress course [Writing in the WordPress voice](https://learn.wordpress.org/course/writing-in-the-wordpress-voice/) as primary authority for WordPress-specific voice and accessibility guidance. A human editor reviews, approves, or rejects every recommended change before it is applied. For the full methodology, see **[AI-Assisted Documentation Processes](https://github.com/dknauss/ai-assisted-docs)**. The machine-readable editorial agent skills and cross-document consistency rules are in the [skills directory](https://github.com/dknauss/ai-assisted-docs/tree/main/wp-docs-skills).
 
 ## Project Health
 
