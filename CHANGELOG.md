@@ -4,6 +4,8 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+## 3.1.1 — 2026-06-17
+
 ### Added
 - Added release-metadata validation so frontmatter version/date and the latest changelog release heading stay aligned, with optional tag/date enforcement during release publication.
 - Added a `Series review` issue form so quarterly and pre-release cross-document alignment checks can be tracked explicitly.
