@@ -21,6 +21,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     concurrency:
       group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name || github.ref }}
       cancel-in-progress: false
@@ -32,25 +33,9 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Install Pandoc
-        run: |
-          PANDOC_VER=3.6.3
-          wget -q "https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb"
-          sudo dpkg -i "pandoc-${PANDOC_VER}-1-amd64.deb"
-          rm "pandoc-${PANDOC_VER}-1-amd64.deb"
-
-      - name: Install LaTeX, fonts, and validators
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y             texlive-xetex             texlive-latex-recommended             texlive-fonts-recommended             texlive-fonts-extra             texlive-latex-extra             lmodern             fonts-noto-core             fonts-noto-extra             epubcheck             poppler-utils             unzip
-
-      - name: Install eisvogel template
-        run: |
-          mkdir -p ~/.pandoc/templates
-          TMPDIR_EIS=$(mktemp -d)
-          curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz"             | tar -xz -C "$TMPDIR_EIS"
-          find "$TMPDIR_EIS" -name "*.latex" -exec cp {} ~/.pandoc/templates/ \;
-          rm -rf "$TMPDIR_EIS"
+      - name: Setup docs toolchain
+        uses: dknauss/ai-assisted-docs/.github/actions/setup-docs-toolchain@daefe86423522f8ce7c42947c5d1c91f7f48b126
+        timeout-minutes: 15
 
       - name: Bootstrap pandoc styling assets
         run: |
@@ -62,7 +47,7 @@ jobs:
             {
               printf '%s\n' 'from: markdown'
               printf '%s\n' 'standalone: true'
-              printf '%s\n' 'pdf-engine: xelatex'
+              printf '%s\n' 'pdf-engine: tectonic'
               printf '%s\n' 'variables:'
               printf '%s\n' '  colorlinks: true'
               printf '%s\n' '  geometry:'
@@ -112,7 +97,7 @@ jobs:
 
           pandoc "$md_file"             --reference-doc=".github/pandoc/reference.docx"             --toc --toc-depth=3             -o "$docx_file"
 
-          pandoc "$docx_file"             --from docx             --template eisvogel             --pdf-engine xelatex             --defaults ".github/pandoc/pdf-defaults.yaml"             --metadata "date=${display_date}"             --toc --toc-depth=3             -o "${base}.pdf"
+          pandoc "$docx_file"             --from docx             --template eisvogel             --pdf-engine tectonic             --defaults ".github/pandoc/pdf-defaults.yaml"             --metadata "date=${display_date}"             --toc --toc-depth=3             -o "${base}.pdf"
 
           pandoc "$docx_file"             --from docx             --css ".github/pandoc/epub.css"             --toc --toc-depth=3             --epub-title-page=false             --metadata "lang=en-US"             -o "${base}.epub"
 
