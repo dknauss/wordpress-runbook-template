@@ -54,19 +54,19 @@ jobs:
             pandoc --print-default-data-file reference.docx > .github/pandoc/reference.docx
           fi
           if [ ! -f .github/pandoc/pdf-defaults.yaml ]; then
-            cat > .github/pandoc/pdf-defaults.yaml <<'YAML'
-            from: markdown
-            standalone: true
-            pdf-engine: xelatex
-            variables:
-              colorlinks: true
-              geometry:
-                - margin=1in
-              header-left: WP-Operations-Runbook
-              header-right: Dan Knauss
-              footer-center: "\thepage"
-              titlepage: false
-            YAML
+            {
+              printf '%s\n' 'from: markdown'
+              printf '%s\n' 'standalone: true'
+              printf '%s\n' 'pdf-engine: xelatex'
+              printf '%s\n' 'variables:'
+              printf '%s\n' '  colorlinks: true'
+              printf '%s\n' '  geometry:'
+              printf '%s\n' '    - margin=1in'
+              printf '%s\n' '  header-left: WP-Operations-Runbook'
+              printf '%s\n' '  header-right: Dan Knauss'
+              printf '%s\n' '  footer-center: "\thepage"'
+              printf '%s\n' '  titlepage: false'
+            } > .github/pandoc/pdf-defaults.yaml
           fi
           if [ ! -f .github/pandoc/epub.css ]; then
             {
