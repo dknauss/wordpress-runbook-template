@@ -4,12 +4,15 @@ on:
   push:
     tags:
       - 'v*'
-  create:
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to release, for example v3.1.0'
         required: true
+        type: string
+      release_date:
+        description: 'Release date to enforce (YYYY-MM-DD). Defaults to today in UTC.'
+        required: false
         type: string
 
 permissions:
@@ -17,10 +20,6 @@ permissions:
 
 jobs:
   release:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      ( github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') ) ||
-      ( github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.ref, 'v') )
     runs-on: ubuntu-latest
     concurrency:
       group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name || github.ref }}
@@ -28,9 +27,97 @@ jobs:
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name || github.ref }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Install Pandoc
+        run: |
+          PANDOC_VER=3.6.3
+          wget -q "https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb"
+          sudo dpkg -i "pandoc-${PANDOC_VER}-1-amd64.deb"
+          rm "pandoc-${PANDOC_VER}-1-amd64.deb"
+
+      - name: Install LaTeX, fonts, and validators
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y             texlive-xetex             texlive-latex-recommended             texlive-fonts-recommended             texlive-fonts-extra             texlive-latex-extra             lmodern             fonts-noto-core             fonts-noto-extra             epubcheck             poppler-utils             unzip
+
+      - name: Install eisvogel template
+        run: |
+          mkdir -p ~/.pandoc/templates
+          TMPDIR_EIS=$(mktemp -d)
+          curl -sL "https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz"             | tar -xz -C "$TMPDIR_EIS"
+          find "$TMPDIR_EIS" -name "*.latex" -exec cp {} ~/.pandoc/templates/ \;
+          rm -rf "$TMPDIR_EIS"
+
+      - name: Bootstrap pandoc styling assets
+        run: |
+          mkdir -p .github/pandoc
+          if [ ! -f .github/pandoc/reference.docx ]; then
+            pandoc --print-default-data-file reference.docx > .github/pandoc/reference.docx
+          fi
+          if [ ! -f .github/pandoc/pdf-defaults.yaml ]; then
+            cat > .github/pandoc/pdf-defaults.yaml <<'YAML'
+            from: markdown
+            standalone: true
+            pdf-engine: xelatex
+            variables:
+              colorlinks: true
+              geometry:
+                - margin=1in
+              header-left: WP-Operations-Runbook
+              header-right: Dan Knauss
+              footer-center: "\thepage"
+              titlepage: false
+            YAML
+          fi
+          if [ ! -f .github/pandoc/epub.css ]; then
+            {
+              printf '%s\n' 'body { font-family: "Noto Serif", Georgia, serif; line-height: 1.6; }'
+              printf '%s\n' 'code, pre { font-family: "Noto Sans Mono", Menlo, monospace; }'
+              printf '%s\n' 'img { max-width: 100%; height: auto; }'
+            } > .github/pandoc/epub.css
+          fi
+
+      - name: Resolve release date
+        id: release_meta
+        run: |
+          release_date="${{ inputs.release_date }}"
+          if [ -z "$release_date" ]; then
+            release_date=$(date -u '+%Y-%m-%d')
+          fi
+          echo "release_date=$release_date" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release metadata
+        run: |
+          python3 .github/scripts/validate-release-metadata.py             --markdown "WP-Operations-Runbook.md"             --changelog CHANGELOG.md             --expected-tag "$RELEASE_TAG"             --expected-date "${{ steps.release_meta.outputs.release_date }}"             --strict-changelog
+
+      - name: Convert primary document
+        run: |
+          md_file="WP-Operations-Runbook.md"
+          base="WP-Operations-Runbook"
+          docx_file="${base}.docx"
+
+          version=$(sed -n '/^---$/,/^---$/{ s/^version: *"\{0,1\}\([^"\n]*\)"\{0,1\}/\1/p }' "$md_file")
+          source_date=$(sed -n '/^---$/,/^---$/{ s/^date: *"\{0,1\}\([^"\n]*\)"\{0,1\}/\1/p }' "$md_file")
+          if [ -n "$version" ] && [ -n "$source_date" ]; then
+            display_date="Version $version — $source_date"
+          elif [ -n "$source_date" ]; then
+            display_date="$source_date"
+          else
+            display_date=""
+          fi
+
+          pandoc "$md_file"             --reference-doc=".github/pandoc/reference.docx"             --toc --toc-depth=3             -o "$docx_file"
+
+          pandoc "$docx_file"             --from docx             --template eisvogel             --pdf-engine xelatex             --defaults ".github/pandoc/pdf-defaults.yaml"             --metadata "date=${display_date}"             --toc --toc-depth=3             -o "${base}.pdf"
+
+          pandoc "$docx_file"             --from docx             --css ".github/pandoc/epub.css"             --toc --toc-depth=3             --epub-title-page=false             --metadata "lang=en-US"             -o "${base}.epub"
+
+      - name: Validate generated artifacts
+        run: python3 .github/scripts/validate-artifacts.py
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe

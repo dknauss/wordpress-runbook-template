@@ -59,6 +59,18 @@ def ensure_exists(path: Path, label: str) -> None:
     print(f"OK   [{label}] exists ({path.stat().st_size} bytes)")
 
 
+
+
+def read_markdown_version(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r'(?m)^version:\s*["\']?([^"\'\n]+)["\']?\s*$', text)
+    if not match:
+        raise ValidationError(f"Markdown frontmatter version not found: {path}")
+    version = normalize_text(match.group(1))
+    if not version:
+        raise ValidationError(f"Markdown frontmatter version is empty: {path}")
+    return version
+
 def extract_pdf_text(path: Path) -> str:
     try:
         result = subprocess.run(
@@ -78,10 +90,10 @@ def extract_pdf_text(path: Path) -> str:
     return result.stdout
 
 
-def validate_pdf(path: Path) -> None:
+def validate_pdf(path: Path, expected_version: str) -> None:
     ensure_exists(path, "PDF")
     text = extract_pdf_text(path)
-    assert_contains(text, (FULL_TITLE, SHORT_TITLE, "Version 3.1", *CANONICAL_TOKENS), "PDF")
+    assert_contains(text, (FULL_TITLE, SHORT_TITLE, f"Version {expected_version}", *CANONICAL_TOKENS), "PDF")
     print("OK   [PDF] canonical text markers found")
     return text
 
@@ -179,9 +191,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        markdown_path = Path(args.markdown)
+        expected_version = read_markdown_version(markdown_path)
         texts = {
-            "Markdown": validate_markdown(Path(args.markdown)),
-            "PDF": validate_pdf(Path(args.pdf)),
+            "Markdown": validate_markdown(markdown_path),
+            "PDF": validate_pdf(Path(args.pdf), expected_version),
             "EPUB": validate_epub(Path(args.epub)),
             "DOCX": validate_docx(Path(args.docx)),
         }

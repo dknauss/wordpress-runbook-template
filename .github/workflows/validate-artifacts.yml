@@ -3,9 +3,14 @@ name: Validate Artifacts
 on:
   push:
     branches: [main]
-    paths:
+    paths: &artifact_paths
+      - 'WP-Operations-Runbook.pdf'
+      - 'WP-Operations-Runbook.docx'
+      - 'WP-Operations-Runbook.epub'
       - '.github/scripts/validate-artifacts.py'
       - '.github/workflows/validate-artifacts.yml'
+  pull_request:
+    paths: *artifact_paths
   workflow_dispatch:
 
 permissions:
