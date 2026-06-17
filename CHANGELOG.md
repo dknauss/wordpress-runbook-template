@@ -5,6 +5,7 @@ All notable changes to the WordPress Operations Runbook template.
 ## Unreleased
 
 ### Added
+- Added release-metadata validation so frontmatter version/date and the latest changelog release heading stay aligned, with optional tag/date enforcement during release publication.
 - Added a `Series review` issue form so quarterly and pre-release cross-document alignment checks can be tracked explicitly.
 - Added a repo-local generated-artifact smoke validator and a dedicated `Validate Artifacts` workflow for PDF, EPUB, and DOCX outputs.
 - Added a Playwright-based PDF visual smoke test and dedicated workflow with committed baselines for critical page regions.
@@ -12,6 +13,7 @@ All notable changes to the WordPress Operations Runbook template.
 - Added Learn WordPress's [Writing in the WordPress voice](https://learn.wordpress.org/course/writing-in-the-wordpress-voice/) as the recommended WordPress-specific voice and accessibility reference when runbook material is adapted into user-facing or cross-team communications.
 
 ### Changed
+- Moved full PDF/DOCX/EPUB publication to the tag-driven release workflow and converted `generate-docs.yml` into a manual preview/build workflow instead of an automatic `main`-push publisher.
 - Made the generated-artifact validator read the expected version string from the Markdown frontmatter instead of hardcoding `Version 3.1`, preventing future publish-flow failures after routine version bumps.
 - Updated Section 1.4 of the canonical runbook so the in-document version history matches the actual template release history (`3.1`, `3.0.1`, `3.0`, `2.0`) instead of stale placeholder entries.
 - Separated Playwright PDF visual validation from the artifact publish path so `generate-docs.yml` can publish after artifact checks while the dedicated visual workflow handles layout regression checks on workflow, packaging, and Pandoc changes.

@@ -1,0 +1,27 @@
+name: Validate Release Metadata
+
+on:
+  push:
+    branches: [main]
+    paths: &release_metadata_paths
+      - 'WP-Operations-Runbook.md'
+      - 'CHANGELOG.md'
+      - '.github/scripts/validate-release-metadata.py'
+      - '.github/workflows/validate-release-metadata.yml'
+  pull_request:
+    paths: *release_metadata_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-release-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Validate release metadata
+        run: |
+          python3 .github/scripts/validate-release-metadata.py                 --markdown 'WP-Operations-Runbook.md'                 --changelog CHANGELOG.md
