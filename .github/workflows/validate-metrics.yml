@@ -2,11 +2,6 @@ name: Validate Metrics
 
 on:
   pull_request:
-    paths:
-      - 'WP-Operations-Runbook.md'
-      - 'docs/current-metrics.md'
-      - '.github/scripts/verify-metrics.sh'
-      - '.github/workflows/validate-metrics.yml'
   push:
     branches: [main]
     paths:
