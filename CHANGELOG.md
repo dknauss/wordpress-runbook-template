@@ -22,6 +22,7 @@ All notable changes to the WordPress Operations Runbook template.
 - CSP example notes the `worker-src` requirement of WordPress 7.1 client-side media processing.
 
 ### Changed
+- Regenerated the PDF, DOCX, and EPUB files from the corrected Markdown and refreshed the PDF visual baselines, which had not been updated since March 2026.
 - §3.2: split the service reference table into two narrower tables so it fits the PDF page. Generated artifacts have not been rebuilt.
 - `CONTRIBUTING.md` describes the current manual build and release flow instead of an automatic publish on merge.
 - `CLAUDE.md` uses portable command names.
