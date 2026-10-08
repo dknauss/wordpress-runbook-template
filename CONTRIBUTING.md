@@ -100,11 +100,16 @@ For canonical document changes:
    needed.
 3. Update `CHANGELOG.md` for any user-visible documentation or workflow change.
 4. Merge to `main`.
-5. Confirm the phased `Generate PDF, Word & EPUB Documents` workflow completes:
-   it should build the outputs, run artifact and PDF visual validation, and only
-   then publish regenerated files back to `main`.
-6. Use the standalone `Validate Artifacts` and `Validate PDF Visuals` workflows
-   for direct validator changes or manual rechecks without regenerating docs.
+5. Merging does not regenerate the tracked PDF, DOCX, and EPUB files. To build
+   them from `main`, run the `Generate PDF, Word & EPUB Documents` workflow
+   manually (`gh workflow run generate-docs.yml`). It builds the outputs, runs
+   artifact validation, and uploads a `generated-docs-bundle` artifact. It does
+   not run PDF visual validation and does not commit or push anything.
+6. To update the tracked files, download the bundle, review it, and commit the
+   regenerated files through a pull request. The standalone `Validate Artifacts`
+   and `Validate PDF Visuals` workflows check the committed files; run them
+   manually for validator changes or rechecks. Release downloads are built
+   separately by the tag-driven `Create Release` workflow.
 7. Create a version tag only when enough user-visible changes justify a release.
    After tagging, confirm the `Create Release` workflow publishes the generated
    artifacts for that tag.
