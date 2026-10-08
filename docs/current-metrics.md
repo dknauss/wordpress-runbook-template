@@ -2,25 +2,25 @@
 
 This file is the single source of truth for architectural counts in the WordPress Operations Runbook. Check this file before writing any count in prose, and update it when adding or removing procedures, commands, or structural elements.
 
-Last verified: 2026-06-14
+Last verified: 2026-10-07
 
 ## Architectural Facts
 
 | Fact | Value | Verification command | Last changed |
 |---|---:|---|---|
-| Document lines | 3,394 | `wc -l WP-Operations-Runbook.md` | 2026-06-14 |
+| Document lines | 3,629 | `wc -l WP-Operations-Runbook.md` | 2026-10-07 |
 | Major sections | 11 | `grep -cE '^## Section' WP-Operations-Runbook.md` | v3.0 |
 | Appendices | 5 | `grep -cE '^## Appendix' WP-Operations-Runbook.md` | v3.0 |
-| WP-CLI commands (total) | 149 | `grep -cE '^\s*wp ' WP-Operations-Runbook.md` | 2026-03-15 |
-| Destructive WP-CLI commands | 44 | `grep -cE '^\s*wp (search-replace|db import|db reset|db query|post delete|comment delete|user delete|plugin delete|plugin deactivate|option update|option delete|rewrite flush|transient delete|cache flush|eval|eval-file)' WP-Operations-Runbook.md` | 2026-03-15 |
-| Commented-out WP-CLI commands | 15 | `grep -cE '^\s*# wp ' WP-Operations-Runbook.md` | 2026-03-15 |
-| Inline WARNING comments (`# WARNING:`) | 35 | `grep -c '# WARNING:' WP-Operations-Runbook.md` | 2026-06-14 |
-| Blockquote WARNING callouts | 19 | `grep -c '> \*\*WARNING:\*\*' WP-Operations-Runbook.md` | 2026-06-14 |
-| `[CUSTOMIZE: ...]` placeholders | 196 | `grep -c '\[CUSTOMIZE:' WP-Operations-Runbook.md` | 2026-06-14 |
-| Plugin-dependent annotations | 7 | `grep -c '# Plugin-dependent' WP-Operations-Runbook.md` | 2026-06-14 |
-| Code fences (total) | 168 | `grep -c '^\`\`\`' WP-Operations-Runbook.md` | 2026-06-14 |
-| Opening fences (with language tag) | 79 | `grep -cE '^\`\`\`[a-z]' WP-Operations-Runbook.md` | 2026-06-14 |
-| Bare closing fences | 89 | `grep -cE '^\`\`\`$' WP-Operations-Runbook.md` | 2026-06-14 |
+| WP-CLI commands (total) | 148 | `grep -cE '^\s*wp ' WP-Operations-Runbook.md` | 2026-10-07 |
+| Destructive WP-CLI commands | 44 | `grep -cE '^\s*wp (search-replace|db import|db reset|db query|post delete|comment delete|user delete|plugin delete|plugin deactivate|option update|option delete|rewrite flush|transient delete|cache flush|eval|eval-file)' WP-Operations-Runbook.md` | 2026-10-07 |
+| Commented-out WP-CLI commands | 16 | `grep -cE '^\s*# wp ' WP-Operations-Runbook.md` | 2026-10-07 |
+| Inline WARNING comments (`# WARNING:`) | 34 | `grep -c '# WARNING:' WP-Operations-Runbook.md` | 2026-10-07 |
+| Blockquote WARNING callouts | 22 | `grep -c '> \*\*WARNING:\*\*' WP-Operations-Runbook.md` | 2026-10-07 |
+| `[CUSTOMIZE: ...]` placeholders | 217 | `grep -c '\[CUSTOMIZE:' WP-Operations-Runbook.md` | 2026-10-07 |
+| Plugin-dependent annotations | 8 | `grep -c '# Plugin-dependent' WP-Operations-Runbook.md` | 2026-10-07 |
+| Code fences (total) | 180 | `grep -c '^\`\`\`' WP-Operations-Runbook.md` | 2026-10-07 |
+| Opening fences (with language tag) | 85 | `grep -cE '^\`\`\`[a-z]' WP-Operations-Runbook.md` | 2026-10-07 |
+| Bare closing fences | 95 | `grep -cE '^\`\`\`$' WP-Operations-Runbook.md` | 2026-10-07 |
 | Output formats | 4 | Markdown, DOCX, EPUB, PDF | v3.0 |
 
 ## Safety Ratios
@@ -29,8 +29,8 @@ These derived metrics help evaluate whether the document maintains adequate safe
 
 | Ratio | Current | Target | Notes |
 |---|---|---|---|
-| Inline warnings / destructive commands | 35 / 44 (80%) | 100% of high-risk commands | Not all destructive commands need inline warnings (e.g., `wp cache flush` in a "Clear Caches" step is low-risk). Focus on commands that destroy unrecoverable data. |
-| Opening fences / closing fences | 79 / 89 | Equal or explainable | Difference of 10 is expected: some code blocks open with bare ``` (no language tag). A mismatch that can't be explained indicates a corrupted fence. |
+| Inline warnings / destructive commands | 34 / 44 (77%) | 100% of high-risk commands | Not all destructive commands need inline warnings (e.g., `wp cache flush` in a "Clear Caches" step is low-risk). Focus on commands that destroy unrecoverable data. |
+| Opening fences / closing fences | 85 / 95 | Equal or explainable | Difference of 10 is expected: some code blocks open with bare ``` (no language tag). A mismatch that can't be explained indicates a corrupted fence. |
 
 ## Verification Procedure
 

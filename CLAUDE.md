@@ -7,6 +7,6 @@ If a task in this repository requires browser automation, Playwright testing, sc
 
 - Say clearly that a fresh browser-capable Claude session is required.
 - Do not imply that Playwright or browser mode can be enabled from inside the current session.
-- Tell the user to restart with `/Users/danknauss/bin/claude-playwright` or `/Users/danknauss/bin/claude-browser-handoff`.
+- Tell the user to restart with `claude-playwright` or `claude-browser-handoff`.
 
 Use this only when browser tooling is actually needed, not when it is merely convenient.

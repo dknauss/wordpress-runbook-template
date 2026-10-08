@@ -4,6 +4,29 @@ All notable changes to the WordPress Operations Runbook template.
 
 ## Unreleased
 
+### Fixed
+- Corrected findings from the 2026-10-07 documentation review and verification round. Recorded in `ai-assisted-docs/reviews/rounds/2026-10-07/`.
+- §5.4: replaced the REST users-route example, which raised a fatal error on PHP 8 and replaced per-operation authorization on write handlers, with a tested snippet that requires authentication for reads and preserves core's permission checks.
+- §11.2: full restore now keeps MySQL running, verifies configuration before the import, restores the separate uploads archive, and sets a `wp-config.php` mode the PHP-FPM pool user can read.
+- §5.1: UFW rules are staged before the firewall is enabled; added an SSH port-change procedure, `KbdInteractiveAuthentication no`, and effective-configuration checks.
+- §10.3: incident containment is now a verified web-server or edge block; `wp maintenance-mode activate` is labeled as not containment, and the Nginx `allow`/`deny` order is corrected.
+- §5.5: separated 2FA enrollment, enforcement, and verification; the `two-factor` plugin has no built-in role enforcement.
+- §5.4: `xmlrpc_enabled` is described as a partial measure; added a POST-based verification.
+- §9.1: corrected the offload plugin slug and configuration method; WebP delivery now falls back to the original image.
+- §10.5 autoload queries match the WordPress 6.6+ autoload values; PHP memory triage checks the PHP-FPM runtime.
+- Appendix A: `wp-config.php` ownership and mode follow the PHP-FPM pool user (440 for the reference stack).
+- §5.5: added a tested must-use plugin that enforces 2FA enrollment for privileged roles.
+- §7.2: the backup script runs as the site user (WP-CLI refuses to run as root), verifies archives with `gzip -t`, and writes a SHA-256 manifest that §11.2 checks before restoring.
+- §5.6: AIDE commands corrected for Debian and Ubuntu (`--config` is required; the initial database move failed on a fresh install).
+- §9.1 offload settings keys verified against the plugin source; PHP upgrade step names the pool settings to carry over.
+- CSP example notes the `worker-src` requirement of WordPress 7.1 client-side media processing.
+
+### Changed
+- §3.2: split the service reference table into two narrower tables so it fits the PDF page. Generated artifacts have not been rebuilt.
+- `CONTRIBUTING.md` describes the current manual build and release flow instead of an automatic publish on merge.
+- `CLAUDE.md` uses portable command names.
+- Updated `docs/current-metrics.md` for the above.
+
 ## 3.1.1 — 2026-06-17
 
 ### Added

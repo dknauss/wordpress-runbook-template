@@ -123,7 +123,7 @@ Use the following controls to keep this runbook operationally reliable:
 |----------|-------|
 | **Domain** | [CUSTOMIZE: example.com] |
 | **Site Name** | [CUSTOMIZE: My WordPress Site] |
-| **WordPress Version** | [CUSTOMIZE: current stable release, e.g. WordPress 7.0] |
+| **WordPress Version** | [CUSTOMIZE: current stable release, e.g. WordPress 7.1] |
 | **PHP Version** | [CUSTOMIZE: 8.3+ recommended; test 8.4 in staging first] |
 | **Server OS** | [CUSTOMIZE: Ubuntu 22.04 LTS] |
 | **Hosting Type** | [CUSTOMIZE: Self-hosted/Managed/VPS] |
@@ -194,12 +194,21 @@ The WordPress site runs on a LEMP (Linux, Nginx, MySQL, PHP) stack:
 
 ### 3.2 Service Configuration Reference
 
-| Service | Version | Port | User | Config Path | Log Path |
-|---------|---------|------|------|-------------|----------|
-| **Nginx** | [CUSTOMIZE: 1.24+] | 80, 443 | `www-data` | `/etc/nginx/nginx.conf` | `/var/log/nginx/` |
-| **PHP-FPM** | [CUSTOMIZE: 8.3+] | 9000 (socket) | `www-data` | `/etc/php/[CUSTOMIZE: 8.x]/fpm/php.ini` | `/var/log/php*.log` |
-| **MySQL** | [CUSTOMIZE: 8.0+] | 3306 (local) | `mysql` | `/etc/mysql/mysql.conf.d/mysqld.cnf` | `/var/log/mysql/error.log` |
-| **Redis** | [CUSTOMIZE: 7.0+] | 6379 | `redis` | `/etc/redis/redis.conf` | `/var/log/redis/redis-server.log` |
+| Service | Version | Port | Runs As |
+|---------|---------|------|---------|
+| **Nginx** | [CUSTOMIZE: 1.24+] | 80, 443 | `www-data` |
+| **PHP-FPM** | [CUSTOMIZE: 8.3+] | 9000 (socket) | [CUSTOMIZE: `www-data`] |
+| **MySQL** | [CUSTOMIZE: 8.0+] | 3306 (local) | `mysql` |
+| **Redis** | [CUSTOMIZE: 7.0+] | 6379 | `redis` |
+
+| Service | Config Path | Log Path |
+|---------|-------------|----------|
+| **Nginx** | `/etc/nginx/nginx.conf` | `/var/log/nginx/` |
+| **PHP-FPM** | `/etc/php/[CUSTOMIZE: 8.x]/fpm/php.ini` | `/var/log/php*.log` |
+| **MySQL** | `/etc/mysql/mysql.conf.d/mysqld.cnf` | `/var/log/mysql/error.log` |
+| **Redis** | `/etc/redis/redis.conf` | `/var/log/redis/redis-server.log` |
+
+> **NOTE:** Record the PHP-FPM pool user that actually serves this site (`user =` in the pool file under `/etc/php/[CUSTOMIZE: 8.x]/fpm/pool.d/`). File ownership and the `wp-config.php` mode in Appendix A depend on it.
 
 ### 3.3 Caching Architecture
 
@@ -280,9 +289,10 @@ The following header is configured in Nginx to enforce HTTPS:
 
 ```nginx
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-# Note: The preload directive submits the domain to browser HSTS preload lists,
-# which is difficult to reverse. Add preload only after confirming all subdomains
-# support HTTPS and obtaining organizational approval.
+# Note: The preload directive does not enroll the domain by itself. It signals
+# consent to inclusion in browser HSTS preload lists; enrollment is a separate
+# submission at hstspreload.org and is difficult to reverse. Add preload only
+# after confirming all subdomains support HTTPS and obtaining organizational approval.
 ```
 
 This tells browsers to only connect via HTTPS for one year.
@@ -476,25 +486,29 @@ wordpress-repo/
 **UFW (Uncomplicated Firewall) Setup:**
 
 ```bash
-# Enable firewall
-sudo ufw enable
+# Set default policies (these do not take effect until the firewall is enabled)
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
 
-# Allow SSH (critical - do this FIRST)
-sudo ufw allow 22/tcp
+# Allow SSH (critical - do this BEFORE enabling the firewall)
+# Use the port sshd actually listens on: sudo sshd -T | grep -i '^port'
+sudo ufw allow [CUSTOMIZE: 22]/tcp
 
 # Allow HTTP and HTTPS
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
-# Block all other incoming traffic
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
+# Review the staged rules, then enable the firewall
+sudo ufw show added
+sudo ufw enable
 
 # Verify rules
-sudo ufw status
+sudo ufw status verbose
 ```
 
 **Expected:** SSH, HTTP, HTTPS allowed; all other ports denied.
+
+> **WARNING:** Keep the current SSH session open and confirm that a second, new SSH session connects before closing it. Enabling UFW without an SSH allow rule can lock you out of the server.
 
 **SSH Hardening (in `/etc/ssh/sshd_config`):**
 
@@ -504,9 +518,11 @@ PermitRootLogin no
 
 # Disable password authentication (use keys only)
 PasswordAuthentication no
+KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 
 # Change default port (optional - use non-standard port)
+# If you change the port, follow "Changing the SSH Port" below.
 Port [CUSTOMIZE: 2222]
 
 # Limit concurrent sessions
@@ -522,12 +538,37 @@ X11Forwarding no
 AllowUsers [CUSTOMIZE: admin@*.example.com wordpress@*.example.com]
 ```
 
-**Restart SSH:**
+**Validate, then restart SSH:**
 ```bash
+# Check syntax before restarting
+sudo sshd -t
+
+# Confirm the effective settings, including Include files and Match blocks
+sudo sshd -T | grep -Ei '^(port|passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|permitrootlogin) '
+
 sudo systemctl restart sshd
 ```
 
-> **WARNING:** Test SSH access before closing your current session to avoid lockout.
+**Expected:** `passwordauthentication no`, `kbdinteractiveauthentication no`, `pubkeyauthentication yes`, `permitrootlogin no`, and the intended port.
+
+> **NOTE:** `KbdInteractiveAuthentication no` closes the PAM password path that `PasswordAuthentication no` alone leaves open. If your approved design uses key plus one-time code through PAM, keep keyboard-interactive enabled and set `AuthenticationMethods publickey,keyboard-interactive` instead.
+
+**Changing the SSH Port:**
+
+```bash
+# 1. Allow the new port while the old port is still open
+sudo ufw allow [CUSTOMIZE: 2222]/tcp
+
+# 2. Change Port in sshd_config, validate, and restart (see above)
+
+# 3. From a second terminal, confirm a new session on the new port
+ssh -p [CUSTOMIZE: 2222] [CUSTOMIZE: admin@example.com]
+
+# 4. Only after step 3 succeeds, remove the old rule
+sudo ufw delete allow 22/tcp
+```
+
+> **WARNING:** Test SSH access in a new session before closing your current session to avoid lockout.
 
 ### 5.2 WordPress Hardening
 
@@ -586,6 +627,8 @@ add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
 # Content Security Policy (CSP) - restrict content sources
 # WARNING: unsafe-eval weakens CSP significantly. Remove where possible.
 # See Benchmark 1.2 for hardened CSP guidance.
+# WordPress 7.1+: client-side media processing in the editor needs
+# worker-src 'self' blob:; without it, image processing falls back to the server.
 add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.example.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;" always;
 
 # HSTS - Force HTTPS
@@ -620,40 +663,94 @@ location = /xmlrpc.php {
 }
 ```
 
-Option 2: Disable via a must-use plugin (`wp-content/mu-plugins/disable-xmlrpc.php`):
-```php
-<?php
-add_filter( 'xmlrpc_enabled', '__return_false' );
+Verify the block with a POST request (an enabled endpoint answers a plain GET with 405, so GET alone is not a useful test):
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: text/xml' \
+  --data '<?xml version="1.0"?><methodCall><methodName>system.listMethods</methodName></methodCall>' \
+  https://[CUSTOMIZE: example.com]/xmlrpc.php
 ```
 
-Additionally, disable trackbacks and pingbacks in **Settings → Discussion** by unchecking "Allow link notifications from other blogs (pingbacks and trackbacks) on new posts."
+**Expected:** `403`. A `200` means the endpoint is still answering.
+
+Option 2 (partial — use only when the web server cannot be configured): Restrict XML-RPC via a must-use plugin (`wp-content/mu-plugins/disable-xmlrpc.php`):
+```php
+<?php
+// Disables XML-RPC methods that require authentication.
+add_filter( 'xmlrpc_enabled', '__return_false' );
+
+// Remove pingback methods, which do not require authentication.
+add_filter( 'xmlrpc_methods', function( $methods ) {
+    unset( $methods['pingback.ping'], $methods['pingback.extensions.getPingbacks'] );
+    return $methods;
+} );
+```
+
+> **NOTE:** The `xmlrpc_enabled` filter does not disable the endpoint. It turns off only the methods that require authentication. Pingbacks and any other unauthenticated or plugin-registered methods keep working unless they are removed separately, and `xmlrpc.php` still loads WordPress for every request. Option 1 is the only complete block.
+
+Additionally, disable trackbacks and pingbacks in **Settings → Discussion** by unchecking "Allow link notifications from other blogs (pingbacks and trackbacks) on new posts." This setting applies to new posts only; existing posts keep their own ping status.
 
 **Scope REST API Exposure (Recommended):**
 
 Keep required public endpoints available (for example, posts on public sites) and restrict only sensitive routes.
 
-Example must-use plugin (`wp-content/mu-plugins/restrict-rest-users.php`) to restrict user-enumeration to authorized users (see Benchmark 5.6):
+Example must-use plugin (`wp-content/mu-plugins/restrict-rest-users.php`) to stop unauthenticated user enumeration (see Benchmark 5.4):
 ```php
 <?php
-// Restrict /wp/v2/users to users with the list_users capability.
+// Require authentication for read access to /wp/v2/users while preserving
+// core's own permission checks for every operation.
 add_filter( 'rest_endpoints', function( $endpoints ) {
-    if ( isset( $endpoints['/wp/v2/users'] ) ) {
-        foreach ( $endpoints['/wp/v2/users'] as $i => $route ) {
-            $endpoints['/wp/v2/users'][ $i ]['permission_callback'] = function() {
-                return current_user_can( 'list_users' );
+    $routes = array( '/wp/v2/users', '/wp/v2/users/(?P<id>[\d]+)' );
+
+    foreach ( $routes as $route ) {
+        if ( empty( $endpoints[ $route ] ) ) {
+            continue;
+        }
+
+        foreach ( $endpoints[ $route ] as $key => $handler ) {
+            // Skip route options (namespace, schema, args); only handlers have numeric keys.
+            if ( ! is_numeric( $key ) || ! is_array( $handler ) || empty( $handler['permission_callback'] ) ) {
+                continue;
+            }
+
+            // Leave create, update, and delete handlers untouched.
+            $methods = is_array( $handler['methods'] ) ? array_keys( $handler['methods'] ) : explode( ',', $handler['methods'] );
+            if ( ! in_array( 'GET', array_map( 'trim', $methods ), true ) ) {
+                continue;
+            }
+
+            $core_check = $handler['permission_callback'];
+
+            $endpoints[ $route ][ $key ]['permission_callback'] = function( $request ) use ( $core_check ) {
+                if ( ! is_user_logged_in() ) {
+                    return new WP_Error(
+                        'rest_user_cannot_view',
+                        'Authentication is required to view users.',
+                        array( 'status' => rest_authorization_required_code() )
+                    );
+                }
+
+                // Defer to the original core check for authenticated requests.
+                return call_user_func( $core_check, $request );
             };
         }
     }
-    if ( isset( $endpoints['/wp/v2/users/(?P<id>[\\d]+)'] ) ) {
-        foreach ( $endpoints['/wp/v2/users/(?P<id>[\\d]+)'] as $i => $route ) {
-            $endpoints['/wp/v2/users/(?P<id>[\\d]+)'][ $i ]['permission_callback'] = function() {
-                return current_user_can( 'list_users' );
-            };
-        }
-    }
+
     return $endpoints;
 } );
 ```
+
+This wraps core's permission check instead of replacing it. Anonymous read requests to the users routes receive `401`. Authenticated requests are still decided by core, so the block editor's author lookups keep working and the create, update, and delete handlers keep their original capability checks.
+
+Verify:
+```bash
+# Anonymous request: expect 401
+curl -s -o /dev/null -w '%{http_code}\n' https://[CUSTOMIZE: example.com]/wp-json/wp/v2/users
+
+# Same route through the query-string form: expect 401
+curl -s -o /dev/null -w '%{http_code}\n' "https://[CUSTOMIZE: example.com]/?rest_route=/wp/v2/users"
+```
+
+> **WARNING:** Do not replace a core route's `permission_callback` with a single capability check. The users routes share one path across read, create, update, and delete handlers; replacing every callback with `current_user_can( 'list_users' )` lets any role that can list users edit or delete them.
 
 > **WARNING:** Avoid blanket REST API authentication requirements unless architecture explicitly requires it. Global blocking often breaks headless front ends, plugins, and theme features.
 
@@ -685,21 +782,78 @@ See [WordPress Security Benchmark](https://github.com/dknauss/wp-security-benchm
 wp plugin install two-factor --activate
 ```
 
-2. In plugin settings, enforce 2FA for all privileged roles:
+2. Enroll every privileged account. Each user enables a provider on their own profile screen (**Users → Profile → Two-Factor Options**); TOTP secrets cannot be provisioned from the command line. Store backup recovery codes in the approved password vault. Privileged accounts are:
    - single-site: `administrator`, `editor`, and any additional role with equivalent authority (for example, `shop_manager`)
    - Multisite: all `Super Admin` accounts plus any site-level admin roles that require elevated access
 
-3. Enroll all privileged accounts and store backup recovery codes in the approved password vault.
+3. Put enforcement in place. The `two-factor` plugin has no built-in setting that requires 2FA for a role or for all users; installing it only makes 2FA available. Record the enforcement control in use in the site's security configuration: [CUSTOMIZE: must-use plugin below / MFA enforced at the single sign-on identity provider / other approved control].
 
-4. Verify operational state:
+   Default control — a must-use plugin (`wp-content/mu-plugins/require-two-factor.php`):
+
+```php
+<?php
+// Require two-factor enrollment for privileged roles (two-factor plugin).
+// An unenrolled privileged account keeps only the `read` capability, which is
+// enough to sign in and enroll on its own profile screen, and nothing else.
+// The restriction applies everywhere capabilities are checked: the Dashboard,
+// the REST API, XML-RPC, and application passwords.
+add_filter( 'user_has_cap', function( $allcaps, $caps, $args, $user ) {
+    static $checking = false;
+
+    $privileged_roles = array( 'administrator', 'editor' ); // Add roles such as shop_manager as needed.
+
+    if ( $checking || ! array_intersect( $privileged_roles, (array) $user->roles ) ) {
+        return $allcaps;
+    }
+
+    // Fail closed: if the plugin is missing or deactivated, treat the account as unenrolled.
+    $checking = true;
+    $enrolled = class_exists( 'Two_Factor_Core' ) && Two_Factor_Core::is_user_using_two_factor( $user->ID );
+    $checking = false;
+
+    return $enrolled ? $allcaps : array( 'read' => true );
+}, 10, 4 );
+
+// Tell the unenrolled user what to do.
+add_action( 'admin_notices', function() {
+    $user = wp_get_current_user();
+    if ( array_intersect( array( 'administrator', 'editor' ), (array) $user->roles ) && ! current_user_can( 'edit_posts' ) ) {
+        echo '<div class="notice notice-error"><p>Two-factor authentication is required for this account. Enable it under Two-Factor Options on this screen to restore access.</p></div>';
+    }
+} );
+```
+
+   How it behaves: a privileged account without an enabled 2FA provider can sign in and open its own profile screen to enroll, but has no other capability in the Dashboard, the REST API, XML-RPC, or through application passwords. Access returns as soon as a provider is enabled. If the `two-factor` plugin is deactivated, privileged accounts are restricted until it is reactivated; the emergency recovery steps below account for this.
+
+   Limits: on Multisite, WordPress grants Super Admin accounts every capability before this filter runs, so Super Admins are not restricted by it — enforce their 2FA at the identity provider or by policy and the verification in step 4. WP-CLI commands run without `--user` are not affected.
+
+   If no enforcement control is in place, treat enrollment as a policy requirement and run the verification in step 4 on a schedule ([CUSTOMIZE: weekly]) and after every privileged-account change.
+
+4. Verify enrollment for each privileged account (installation alone proves nothing about enrollment):
 
 ```bash
 wp plugin is-active two-factor && echo "2FA plugin active"
+
+# List privileged accounts
 wp user list --role=administrator --fields=ID,user_login,user_email --format=table
 wp user list --role=editor --fields=ID,user_login,user_email --format=table
 
 # Multisite only
 wp super-admin list
+
+# Plugin-dependent - uncomment when two-factor 0.17 or later is installed:
+# Show the 2FA status of one account
+# wp two-factor status [CUSTOMIZE: user_login]
+# Check every administrator
+# for u in $(wp user list --role=administrator --field=user_login); do wp two-factor status "$u"; done
+```
+
+**Expected:** Every privileged account reports at least one enabled provider. Any account without one is an open finding.
+
+Test the enforcement control: sign in with a test privileged account that has no 2FA enrolled and confirm it can reach only its profile screen. With the must-use plugin above, this check should print `restricted`:
+
+```bash
+wp eval 'echo user_can( get_user_by( "login", "[CUSTOMIZE: unenrolled_test_admin]" ), "manage_options" ) ? "NOT restricted" : "restricted";'
 ```
 
 5. Document exceptions and break-glass approvals (owner, approver, expiry, and rollback steps).
@@ -712,6 +866,8 @@ wp super-admin list
 
 # Last resort only during approved incident response:
 # WARNING: This temporarily removes a privileged-account safeguard for every affected user. Use only during an approved, time-bounded recovery window.
+# If the require-two-factor.php must-use plugin is installed, move it out of
+# wp-content/mu-plugins/ first; otherwise deactivating two-factor restricts every privileged account.
 wp plugin deactivate two-factor
 
 # Re-enable immediately after account recovery
@@ -782,27 +938,28 @@ Protected actions must include, at minimum:
 # Install AIDE
 sudo apt-get install aide aide-common
 
-# Initialize AIDE database (takes several minutes)
+# Initialize AIDE database (takes several minutes; writes /var/lib/aide/aide.db.new)
 sudo aideinit
 
-# Move database to production location
-sudo mv /var/lib/aide/aide.db /var/lib/aide/aide.db.orig
+# Activate the new database
 sudo cp /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 
-# Check file integrity
-sudo aide --check
+# Check file integrity (Debian and Ubuntu packages require the --config option)
+sudo aide --config /etc/aide/aide.conf --check
 
 # Update database after planned changes
-sudo aide --init
+sudo aide --config /etc/aide/aide.conf --init
 sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 ```
+
+Paths and the `aideinit` helper are specific to Debian and Ubuntu. On RHEL-family systems the configuration is `/etc/aide.conf`, the database is `/var/lib/aide/aide.db.gz`, and `aide --init` replaces `aideinit`.
 
 **Configure Automated Checking:**
 
 Add to crontab (`crontab -e`):
 ```bash
 # Run AIDE check daily at 2 AM
-0 2 * * * /usr/bin/aide --check | mail -s "AIDE Report for $(hostname)" root@example.com
+0 2 * * * /usr/bin/aide --config /etc/aide/aide.conf --check | mail -s "AIDE Report for $(hostname)" root@example.com
 ```
 
 **Monitor WordPress File Changes:**
@@ -1121,8 +1278,13 @@ wp transient delete --expired
 
 3. **Update PHP-FPM Pool Configuration**
    ```bash
-   # Edit pool configuration
+   # Carry the site's pool settings over from the old version's pool file:
+   # user/group, listen socket and its owner, pm.* limits, and any
+   # php_admin_value / php_value overrides (see Benchmark 2.x).
    sudo nano /etc/php/8.3/fpm/pool.d/www.conf
+
+   # Validate before restarting
+   sudo php-fpm8.3 -t
    
    # Restart PHP-FPM
    sudo systemctl restart php8.3-fpm
@@ -1468,6 +1630,13 @@ RETENTION_DAYS=90
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE="/var/log/wordpress-backup.log"
 
+# Run as the site user, not root: WP-CLI refuses to run as root, and backups
+# should not be created with root ownership.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Run this script as the site user, not root." >&2
+    exit 1
+fi
+
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
 cd "$WP_ROOT"
@@ -1503,14 +1672,17 @@ aws s3 cp "$BACKUP_DIR/uploads_${TIMESTAMP}.tar.gz" "$REMOTE_URI" >> "$LOG_FILE"
 echo "[$(date)] Cleaning up old backups..." >> "$LOG_FILE"
 find "$BACKUP_DIR" -type f -mtime +$RETENTION_DAYS -delete
 
-# 6. Verify backup integrity
+# 6. Verify backup integrity (set -e stops the script if any archive is corrupt)
 echo "[$(date)] Verifying backup..." >> "$LOG_FILE"
-for file in "$BACKUP_DIR"/*_${TIMESTAMP}.*; do
-    if [ -f "$file" ]; then
-        SIZE=$(du -h "$file" | cut -f1)
-        echo "[$(date)] Backup file: $(basename $file) (Size: $SIZE)" >> "$LOG_FILE"
-    fi
+for file in "$BACKUP_DIR"/*_${TIMESTAMP}.*gz; do
+    gzip -t "$file"
+    SIZE=$(du -h "$file" | cut -f1)
+    echo "[$(date)] Backup file: $(basename "$file") (Size: $SIZE, gzip OK)" >> "$LOG_FILE"
 done
+
+# 7. Record checksums so a restore can confirm the archives are intact and from the same run
+(cd "$BACKUP_DIR" && sha256sum *_${TIMESTAMP}.*gz > "checksums_${TIMESTAMP}.sha256")
+aws s3 cp "$BACKUP_DIR/checksums_${TIMESTAMP}.sha256" "$REMOTE_URI" >> "$LOG_FILE" 2>&1
 
 echo "[$(date)] Backup completed successfully" >> "$LOG_FILE"
 ```
@@ -1518,18 +1690,23 @@ echo "[$(date)] Backup completed successfully" >> "$LOG_FILE"
 **Make Script Executable:**
 
 ```bash
-sudo chmod +x /usr/local/bin/wordpress-backup.sh
+sudo chmod 755 /usr/local/bin/wordpress-backup.sh
 sudo chown root:root /usr/local/bin/wordpress-backup.sh
+
+# Create the log file owned by the site user that runs the script
+sudo install -o [CUSTOMIZE: wp_user] -g [CUSTOMIZE: wp_user] -m 640 /dev/null /var/log/wordpress-backup.log
 ```
 
-**Schedule with Cron:**
+The script is owned by root so the site user cannot modify it, and runs as the site user. That user needs read access to the WordPress files, write access to the backup directory and the log file, and the remote-storage credentials.
+
+**Schedule with Cron** (`/etc/cron.d/wordpress-backup`; the sixth field is the user the job runs as):
 
 ```bash
 # Run backup every 6 hours
-0 */6 * * * /usr/local/bin/wordpress-backup.sh
+0 */6 * * * [CUSTOMIZE: wp_user] /usr/local/bin/wordpress-backup.sh
 
 # Run weekly full snapshot at 2 AM Sunday
-0 2 * * 0 /usr/local/bin/wordpress-backup.sh
+0 2 * * 0 [CUSTOMIZE: wp_user] /usr/local/bin/wordpress-backup.sh
 ```
 
 ### 7.3 Backup Verification
@@ -1897,15 +2074,24 @@ wp plugin install wp-smushit --activate
 Or configure in Nginx for automatic WebP delivery:
 
 ```nginx
-location ~* ^.+\.(jpg|jpeg|gif|png)$ {
-    # Serve WebP if browser accepts it and file exists
-    if ($http_accept ~* "webp") {
-        rewrite ^(.*)$ $1.webp break;
-    }
+# In the http block: pick the .webp suffix only when the browser accepts WebP
+map $http_accept $webp_suffix {
+    default        "";
+    "~*image/webp" ".webp";
+}
+
+# In the server block
+location ~* \.(jpe?g|gif|png)$ {
+    # Serve image.jpg.webp if the browser accepts WebP and the file exists;
+    # otherwise fall back to the original image.
+    try_files $uri$webp_suffix $uri =404;
+    add_header Vary Accept;
     expires 30d;
-    add_header Cache-Control "public, immutable";
+    add_header Cache-Control "public";
 }
 ```
+
+This expects sidecar files named `image.jpg.webp` next to each original. Test both cases: an image with a sidecar and one without, each requested with and without `Accept: image/webp`.
 
 **Monitor Upload Folder Size:**
 
@@ -1923,16 +2109,23 @@ wp media regenerate --yes  # Regenerate thumbnails
 **Offload Media to CDN (Optional):**
 
 ```bash
-# Install offload plugin
-wp plugin install wordpress-unlimited-amazon-s3-media-library --activate
-
-# Configure S3 bucket
-# WARNING: This rewrites plugin settings in the live database. Validate the bucket, region, and plugin-specific key names before saving.
-wp option update as3cf_settings '{
-  "bucket": "[CUSTOMIZE: my-bucket]",
-  "region": "[CUSTOMIZE: us-east-1]"
-}'
+# Install offload plugin (WP Offload Media Lite)
+wp plugin install amazon-s3-and-cloudfront --activate
 ```
+
+Configure the bucket and region in the plugin's settings screen, or define the plugin's settings constant in `wp-config.php` so the configuration is version-controlled and cannot be changed from the Dashboard:
+
+```php
+// Plugin-dependent: WP Offload Media settings constant.
+define( 'AS3CF_SETTINGS', serialize( array(
+    'provider'         => 'aws',
+    'use-server-roles' => true, // Use the instance role instead of stored access keys.
+    'bucket'           => '[CUSTOMIZE: my-bucket]',
+    'region'           => '[CUSTOMIZE: us-east-1]',
+) ) );
+```
+
+Do not write the plugin's settings with `wp option update`: a JSON string is stored as plain text unless `--format=json` is passed, and either way the command replaces the whole option and discards existing settings. Supply storage credentials through an instance role or environment variables rather than the database (see Benchmark 11.1).
 
 ### 9.2 Publishing Workflow
 
@@ -2158,7 +2351,12 @@ Users may be unable to read content, authenticate, publish, or complete transact
    ```
 7. **Check PHP memory constraints**
    ```bash
+   # CLI value only. PHP-FPM can load a different php.ini and pool overrides.
    php -r "echo ini_get('memory_limit').PHP_EOL;"
+
+   # Effective value for the serving pool (run as root)
+   php-fpm[CUSTOMIZE: 8.x] -i | grep -i '^memory_limit'
+   grep -R 'memory_limit' /etc/php/[CUSTOMIZE: 8.x]/fpm/pool.d/
    ```
 
 **Immediate Mitigation:**
@@ -2230,15 +2428,20 @@ Escalation: [Your contact details]
 
 1. **Contain exposure**
    ```bash
-   # Take site offline to prevent further data exfiltration
-   # Option 1: Redirect to maintenance page (requires WP-CLI 2.5+)
-   wp maintenance-mode activate
+   # Block all traffic except the response team at the web server or edge.
+   # Add inside the Nginx server block. Order matters: Nginx applies the first
+   # matching rule, so the allow line must come before deny all.
+   #   allow [CUSTOMIZE: your-ip];
+   #   deny all;
+   sudo nginx -t && sudo systemctl reload nginx
 
-   # Option 2: Block all traffic except admins
-   # Add to .htaccess or nginx config:
-   # deny all;
-   # allow [CUSTOMIZE: your-ip];
+   # Verify from an allowed address (expect 200) and from any other network (expect 403)
+   curl -s -o /dev/null -w '%{http_code}\n' https://[CUSTOMIZE: example.com]/
    ```
+
+   If a CDN or WAF fronts the site, apply the same block there and confirm the origin does not answer direct-IP requests. Where data is leaving the server, also restrict outbound traffic at the host or network firewall. Keep the block in place until the incident owner releases it.
+
+   > **WARNING:** `wp maintenance-mode activate` is not containment. WordPress ignores the `.maintenance` file ten minutes after it is written, and maintenance mode does not stop malicious PHP that is requested directly or outbound connections. Use it only as a short visitor-facing notice alongside the block above.
 2. **Determine scope of compromise**
    ```bash
    wp user list --format=table
@@ -2262,7 +2465,7 @@ Escalation: [Your contact details]
   # Wordfence scans must be initiated through the Dashboard at Wordfence > Scan
    # For CLI-based malware scanning, use dedicated tools:
    clamscan -r [CUSTOMIZE: /home/wordpress/public_html]/
-   aide --check > /tmp/aide-report.txt
+   sudo aide --config /etc/aide/aide.conf --check > /tmp/aide-report.txt
    ```
 
 **Immediate Mitigation:**
@@ -2417,8 +2620,9 @@ Users experience slow page loads, failed submissions, and reduced admin producti
    wp cron event list
    ps aux | grep "wp cron"
    # Check autoloaded options size (values over 1MB indicate bloat)
-   wp db query "SELECT SUM(LENGTH(option_value)) AS autoload_bytes FROM $(wp db prefix)options WHERE autoload = 'yes';"
-   wp db query "SELECT option_name, LENGTH(option_value) AS size FROM $(wp db prefix)options WHERE autoload = 'yes' ORDER BY size DESC LIMIT 10;"
+   # WordPress 6.6+ autoloads the values 'yes', 'on', 'auto-on', and 'auto'
+   wp db query "SELECT SUM(LENGTH(option_value)) AS autoload_bytes FROM $(wp db prefix)options WHERE autoload IN ('yes','on','auto-on','auto');"
+   wp db query "SELECT option_name, LENGTH(option_value) AS size FROM $(wp db prefix)options WHERE autoload IN ('yes','on','auto-on','auto') ORDER BY size DESC LIMIT 10;"
    ```
 
 If WP-Cron is a recurring bottleneck, see the [WordPress Security Hardening Guide](https://github.com/dknauss/wp-security-hardening-guide) §7.2 for guidance on replacing it with a system cron job, and [Section 6.6](#wordpress-cron-wp-cron-management) for the operational procedure.
@@ -2545,6 +2749,8 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 - New server ready (or current server isolated for recovery)
 - Database backup in hand
 - WordPress file backup in hand
+- Uploads backup in hand (the backup script in Section 7.2 stores uploads in a separate `uploads_TIMESTAMP.tar.gz` archive)
+- All three archives come from the same backup run (same `TIMESTAMP`)
 - Change owner assigned
 - If using managed hosting or managed database services, provider restore workflow or support path identified
 
@@ -2555,11 +2761,14 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    # If using new server, ensure LEMP stack is installed
    # See Section 3.1 for architecture overview
 
-   # If reusing the current server, stop services first and move the old web
+   # If reusing the current server, stop the web tier first and move the old web
    # root aside instead of deleting raw database files.
    sudo systemctl stop nginx
    sudo systemctl stop [CUSTOMIZE: php_fpm_service]
-   sudo systemctl stop mysql
+
+   # Keep MySQL running: the database restore in step 4 needs it.
+   sudo systemctl start mysql
+   sudo systemctl is-active mysql
 
    sudo mv /home/wordpress/public_html /home/wordpress/public_html.pre-restore.$(date +%Y%m%d-%H%M%S)
    sudo mkdir -p /home/wordpress/public_html
@@ -2567,29 +2776,52 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
 
    > **WARNING:** Do not delete the raw MySQL datadir with `rm -rf`. Recreate the database through MySQL or use the managed service's restore controls instead.
 
-2. **Restore WordPress Files**
+2. **Restore WordPress Files and Uploads**
    ```bash
+   # Confirm the archives are intact and from the same backup run
+   cd /home/wordpress/backup && sha256sum -c checksums_TIMESTAMP.sha256
+
    # Option 1: From local backup
    tar -xzf /home/wordpress/backup/wordpress_TIMESTAMP.tar.gz -C /
+   tar -xzf /home/wordpress/backup/uploads_TIMESTAMP.tar.gz -C /
    
    # Option 2: From S3
    aws s3 cp s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/wordpress_TIMESTAMP.tar.gz - | tar -xz -C /
+   aws s3 cp s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/uploads_TIMESTAMP.tar.gz - | tar -xz -C /
    
    # Verify files exist
    ls -la /home/wordpress/public_html/wp-config.php
+   ls /home/wordpress/public_html/wp-content/uploads | head
    ```
 
-3. **Restore Database**
+3. **Restore Configuration Files**
    ```bash
+   cd /home/wordpress/public_html
+
+   # Verify wp-config.php has correct database credentials
+   grep "DB_NAME\|DB_USER\|DB_HOST" wp-config.php
+   
+   # Update wp-config.php if needed
+   wp config set DB_NAME [CUSTOMIZE: wordpress_db]
+   wp config set DB_USER [CUSTOMIZE: wp_user]
+   ```
+
+4. **Restore Database**
+   ```bash
+   # Confirm MySQL is accepting connections before continuing
+   mysqladmin -u root -p ping
+
    # Create database if not exists
    mysql -u root -p <<EOF
    CREATE DATABASE IF NOT EXISTS [CUSTOMIZE: wordpress_db];
-   CREATE USER '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
+   CREATE USER IF NOT EXISTS '[CUSTOMIZE: wp_user]'@'localhost' IDENTIFIED BY '[password]';
    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON [CUSTOMIZE: wordpress_db].* TO '[CUSTOMIZE: wp_user]'@'localhost';
    FLUSH PRIVILEGES;
    EOF
    
-   # Restore from backup
+   # Restore from backup (run from the WordPress root so WP-CLI finds wp-config.php)
+   cd /home/wordpress/public_html
+
    # Option 1: From local backup
    gunzip < /home/wordpress/backup/db_TIMESTAMP.sql.gz | wp db import -
    
@@ -2597,7 +2829,7 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    aws s3 cp s3://[CUSTOMIZE: backup-bucket]/[CUSTOMIZE: example.com]/db_TIMESTAMP.sql.gz - | gunzip | wp db import -
    ```
 
-4. **Restore Permissions**
+5. **Restore Permissions**
    ```bash
    # Set correct ownership
    sudo chown -R [CUSTOMIZE: wp_user]:www-data /home/wordpress/public_html
@@ -2605,17 +2837,14 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    # Set correct permissions (see Appendix A)
    find /home/wordpress/public_html -type f -exec chmod 644 {} \;
    find /home/wordpress/public_html -type d -exec chmod 755 {} \;
-   chmod 400 /home/wordpress/public_html/wp-config.php
-   ```
 
-5. **Restore Configuration Files**
-   ```bash
-   # Verify wp-config.php has correct database credentials
-   grep "DB_NAME\|DB_USER\|DB_HOST" /home/wordpress/public_html/wp-config.php
-   
-   # Update wp-config.php if needed
-   wp config set DB_NAME [CUSTOMIZE: wordpress_db]
-   wp config set DB_USER [CUSTOMIZE: wp_user]
+   # wp-config.php must stay readable by the PHP-FPM pool user.
+   # Pool runs as www-data (reference stack): owner read, group read.
+   chmod 440 /home/wordpress/public_html/wp-config.php
+   # Pool runs as the file owner instead: use chmod 400.
+
+   # Confirm the pool user can read the file
+   sudo -u [CUSTOMIZE: www-data] test -r /home/wordpress/public_html/wp-config.php && echo "wp-config.php readable by PHP-FPM"
    ```
 
 6. **Verify Restoration**
@@ -2654,13 +2883,15 @@ Lifecycle metadata for disaster recovery procedures is tracked in Appendix E.
    # wp w3-total-cache flush all
    # wp redis flush-db
 
-   # Restart services
-   sudo systemctl restart mysql
-   sudo systemctl restart [CUSTOMIZE: php_fpm_service]
-   sudo systemctl restart nginx
+   # Start the web tier (MySQL has been running since step 1)
+   sudo systemctl start [CUSTOMIZE: php_fpm_service]
+   sudo systemctl start nginx
    
    # Test site
    curl -I https://[CUSTOMIZE: example.com]
+
+   # Test a restored media file (expect 200)
+   curl -s -o /dev/null -w '%{http_code}\n' "$(wp post list --post_type=attachment --posts_per_page=1 --field=guid)"
    ```
 
 9. **Post-Restore**
@@ -2858,7 +3089,7 @@ Proper file permissions are critical for security. WordPress files should not be
 |------|------|-------|-------|------|---------|
 | `/home/wordpress/public_html/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Web root - readable by web server, owned by site user |
 | `/home/wordpress/public_html/*.php` | file | [CUSTOMIZE: wp_user] | www-data | 644 | PHP files - not world-writable |
-| `/home/wordpress/public_html/wp-config.php` | file | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 400 (600 temporary) | Config - most restrictive practical mode |
+| `/home/wordpress/public_html/wp-config.php` | file | [CUSTOMIZE: wp_user] | www-data | 440 (640 temporary) | Config - readable by the PHP-FPM pool user, writable by no one in steady state |
 | `/home/wordpress/public_html/wp-content/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Content directory |
 | `/home/wordpress/public_html/wp-content/uploads/` | dir | [CUSTOMIZE: wp_user] | www-data | 755/775 | User uploads (write as needed) |
 | `/home/wordpress/public_html/wp-content/uploads/*` | file | [CUSTOMIZE: wp_user] | www-data | 644/664 | Uploaded files |
@@ -2866,6 +3097,8 @@ Proper file permissions are critical for security. WordPress files should not be
 | `/home/wordpress/public_html/wp-content/themes/` | dir | [CUSTOMIZE: wp_user] | www-data | 755 | Themes directory |
 | `/home/wordpress/public_html/.htaccess` | file | [CUSTOMIZE: wp_user] | www-data | 644 | Rewrite rules |
 | `/home/wordpress/backup/` | dir | [CUSTOMIZE: wp_user] | [CUSTOMIZE: wp_user] | 700 | Backups - owner only |
+
+> **NOTE:** The `wp-config.php` row assumes the reference stack, where PHP-FPM runs as `www-data` and files are owned by a separate site user. PHP-FPM must be able to read the file. If the pool runs as the file owner, use owner-only `400` (`600` temporary) with the owner as group. Mode `400` with a different pool user makes the site fail with a database-configuration error.
 
 ### A.2 Permission Reset Script
 
@@ -2881,6 +3114,8 @@ set -e
 WP_ROOT="[CUSTOMIZE: /home/wordpress/public_html]"
 WP_OWNER="[CUSTOMIZE: wp_user]"
 WP_GROUP="www-data"  # web server group
+# 440 when PHP-FPM runs as $WP_GROUP (reference stack); 400 when it runs as $WP_OWNER
+WP_CONFIG_MODE="[CUSTOMIZE: 440]"
 
 if [ ! -d "$WP_ROOT" ]; then
     echo "Error: WordPress directory not found at $WP_ROOT"
@@ -2897,9 +3132,9 @@ find "$WP_ROOT" -type d -exec chmod 755 {} \;
 echo "Setting file permissions to 644..."
 find "$WP_ROOT" -type f -exec chmod 644 {} \;
 
-# wp-config.php: 400 (r--------) steady-state
-echo "Setting wp-config.php to 400 (use 600 temporarily only during managed edits)..."
-chmod 400 "$WP_ROOT/wp-config.php"
+# wp-config.php: read-only, and readable by the PHP-FPM pool user
+echo "Setting wp-config.php to $WP_CONFIG_MODE (add owner write temporarily only during managed edits)..."
+chmod "$WP_CONFIG_MODE" "$WP_ROOT/wp-config.php"
 
 # .htaccess: 644
 echo "Setting .htaccess to 644..."
@@ -2986,7 +3221,7 @@ define('DISALLOW_FILE_EDIT', true);
 // define('DISALLOW_FILE_MODS', true);
 
 // Security: Disable XML-RPC — block at web server level (see Section 5.4)
-// or use a must-use plugin: add_filter('xmlrpc_enabled', '__return_false');
+// The xmlrpc_enabled filter is a partial measure only: it leaves unauthenticated methods available.
 
 // Security: Force HTTPS
 define('FORCE_SSL_ADMIN', true);
